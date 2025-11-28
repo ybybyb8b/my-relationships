@@ -1,0 +1,68 @@
+name: Build Unsigned IPA for Sideloadly
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # 允许手动点击按钮触发
+
+jobs:
+  build:
+    runs-on: macos-latest # 必须用 Mac 环境
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Assets (Vite)
+        run: npm run build
+
+      # === 初始化 iOS 环境 ===
+      # 注意：因为你是 Windows，仓库里可能没有 ios 文件夹
+      # 我们让 CI 现场生成一个
+      - name: Add iOS Platform
+        run: |
+          npm install @capacitor/ios
+          npx cap add ios
+          npx cap sync
+
+      # === 核心步骤：生成无签名 App ===
+      # 使用 xcodebuild 生成 .app 文件，并强制关闭签名校验
+      - name: Build Unsigned .app
+        run: |
+          cd ios/App
+          xcodebuild build \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath derivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      # === 打包成 IPA ===
+      # Sideloadly 需要标准的 IPA 结构：Payload/App.app
+      - name: Package into IPA
+        run: |
+          cd ios/App
+          mkdir Payload
+          # 把生成的 .app 移动到 Payload 文件夹
+          cp -r derivedData/Build/Products/Release-iphoneos/App.app Payload/
+          # 压缩成 .ipa
+          zip -r DeepRelations.ipa Payload
+
+      # === 上传结果 ===
+      # 跑完后你能在 GitHub 页面下载这个文件
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: DeepRelations-Unsigned
+          path: ios/App/DeepRelations.ipa

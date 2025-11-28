@@ -1,16 +1,41 @@
+/* === 引入自定义手写字体 === */
+@font-face {
+  font-family: 'MyHandwriting';
+  /* 注意：这里变成了 /fonts/...，代表从根目录找 */
+  src: url('/fonts/Handwriting.otf') format('truetype'); 
+  font-weight: normal;
+  font-style: normal;
+  /* 加上 font-display 避免加载时文字隐形 */
+  font-display: swap; 
+}
+
+@font-face {
+  font-family: 'MyMainFont'; /* 起个名字 */
+  src: url('/fonts/MainFont.ttf') format('truetype'); /* 注意文件名对应 */
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ... 下面是你原来的代码 ... */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    /* 强制指定浅色模式下的默认值 */
-    @apply bg-ios-bg text-ios-text antialiased;
+    /* 强制指定背景色为 #fafaf9 (浅色) 和 black (深色) */
+    @apply bg-[#fafaf9] text-[#1c1c1e] antialiased;
   }
 
-  /* 当 html 标签有 dark 类时，强制应用深色背景 */
+  /* 深色模式适配 */
   :root.dark body {
-    @apply bg-ios-bg-dark text-ios-text-dark;
+    @apply bg-black text-white;
   }
 }
 

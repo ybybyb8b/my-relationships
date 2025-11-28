@@ -38,7 +38,10 @@ export default {
         'macaron-purple-dark': '#3A2C4A',
       },
       fontFamily: {
+        hand: ['MyHandwriting', 'sans-serif'],
+
         sans: [
+          'MyMainFont',
           '-apple-system', 
           'BlinkMacSystemFont', 
           '"SF Pro Text"', 

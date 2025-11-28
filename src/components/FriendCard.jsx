@@ -1,53 +1,96 @@
-import { Link } from "react-router-dom"; // <--- 1. 引入 Link
-import { cn } from "../lib/utils";
-
-const colorVariants = {
-  blue: "from-macaron-blue/80 to-macaron-blue/10 dark:from-macaron-blue-dark/60 dark:to-macaron-blue-dark/5",
-  pink: "from-macaron-pink/80 to-macaron-pink/10 dark:from-macaron-pink-dark/60 dark:to-macaron-pink-dark/5",
-  green: "from-macaron-green/80 to-macaron-green/10 dark:from-macaron-green-dark/60 dark:to-macaron-green-dark/5",
-  yellow: "from-macaron-yellow/80 to-macaron-yellow/10 dark:from-macaron-yellow-dark/60 dark:to-macaron-yellow-dark/5",
-  purple: "from-macaron-purple/80 to-macaron-purple/10 dark:from-macaron-purple-dark/60 dark:to-macaron-purple-dark/5",
-};
+import { Link } from "react-router-dom";
+import { cn, THEME_COLORS } from "../lib/utils";
 
 export default function FriendCard({ friend }) {
-  const colorClass = colorVariants[friend.color] || colorVariants.blue;
+  const theme = THEME_COLORS[friend.color] || THEME_COLORS.default;
+
+  // 格式化生日文本
+  const getBirthdayString = () => {
+    if (!friend.birthday || !friend.birthday.month || !friend.birthday.day) {
+      return null; // 没填生日返回 null，方便后面判断是否渲染
+    }
+    // 为了配合手写风，用点号分隔更有感觉，例如 10.20
+    return `${friend.birthday.month}.${friend.birthday.day}`;
+  };
+
+  const birthdayStr = getBirthdayString();
 
   return (
-    // <--- 2. 改为 Link，并指向 /friend/ID
     <Link 
       to={`/friend/${friend.id}`} 
-      className="group relative w-full aspect-[4/5] rounded-[2rem] overflow-hidden isolate transition-transform duration-300 hover:scale-[1.02] active:scale-95 block"
+      className={cn(
+        "group relative block w-full",
+        "transition-transform duration-300 hover:scale-[1.02] hover:-rotate-1 active:scale-95"
+      )}
     >
-      {/* ... (中间所有的内容完全保持不变，不需要动) ... */}
-      <div
-        className={cn(
-          "absolute inset-0 -z-10 bg-gradient-to-tl blur-2xl opacity-70 dark:opacity-50 transition-colors duration-500",
-          colorClass
-        )}
-      />
-      <div className="absolute inset-0 z-0 bg-white/30 dark:bg-white/5 backdrop-blur-md border border-white/40 dark:border-white/10 rounded-[2rem]" />
-      <div className="relative z-10 h-full flex flex-col items-center justify-between p-5 text-center">
-        <div className="mt-4 relative">
-            <div className="w-20 h-20 text-4xl flex items-center justify-center bg-white/50 dark:bg-white/10 backdrop-blur-sm rounded-full shadow-sm border border-white/30">
-                {friend.avatar}
-            </div>
-            {friend.tag && (
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 text-[10px] font-medium bg-white dark:bg-ios-card-dark/80 backdrop-blur-md rounded-full shadow-sm border border-white/20 whitespace-nowrap">
-                {friend.tag}
+      <div className={cn(
+        "relative w-full rounded-lg shadow-md overflow-hidden flex flex-col",
+        theme.paper
+      )}>
+        
+        {/* Padding */}
+        <div className="p-3 pb-0">
+          
+          {/* 照片区域 */}
+          <div className={cn(
+            "aspect-square w-full rounded-sm overflow-hidden flex items-center justify-center relative",
+            theme.photo,
+            "shadow-inner"
+          )}>
+            
+            {/* 噪点纹理 */}
+            <div className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] pointer-events-none"></div>
+
+            {/* 有照片显示照片，无照片显示首字 */}
+            {friend.photo ? (
+              <img 
+                src={friend.photo} 
+                alt={friend.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : (
+              <div className="relative z-10 text-5xl font-bold opacity-60 drop-shadow-sm group-hover:scale-110 transition-transform duration-300 select-none">
+                {friend.name ? friend.name.charAt(0).toUpperCase() : "?"}
               </div>
             )}
+
+            {/* 标签依然保留，贴在角落很有感觉 */}
+            {friend.tag && (
+              <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-white/80 backdrop-blur-sm rounded text-[9px] font-bold text-gray-600 shadow-sm z-20">
+                #{friend.tag}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-black dark:text-white/90">
+
+        {/* === 修改点：手写区 (Name + Birthday 同一行) === */}
+        {/* flex items-baseline: 让大字和小字的底部对齐
+            justify-center gap-2: 居中，中间空一点间距
+        */}
+        <div className="pt-3 pb-4 px-3 min-h-[60px] flex items-baseline justify-center gap-2">
+          {/* 名字：字号 text-xl (适中)，加粗 */}
+          <h3 className={cn(
+            "font-bold text-xl leading-tight tracking-wide font-hand truncate max-w-[70%]", 
+            "font-hand",
+            theme.text
+          )}>
             {friend.name}
           </h3>
-          {friend.nextAction && (
-            <p className="text-xs text-black/60 dark:text-white/60 mt-1 font-medium">
-              {friend.nextAction}
-            </p>
+          
+          {/* 生日：只有存在时才显示，小字号 text-sm，颜色淡一点 */}
+          {birthdayStr && (
+            <span className={cn(
+              "text-m font-medium opacity-60 font-hand whitespace-nowrap font-hand", 
+              theme.text
+            )}>
+              {birthdayStr}
+            </span>
           )}
         </div>
+
       </div>
+      
+      <div className="absolute inset-0 rounded-lg shadow-xl opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none" />
     </Link>
   );
 }

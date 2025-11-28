@@ -2,11 +2,14 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('RelationshipsDB');
 
-// 定义数据库结构
 db.version(1).stores({
-  // 朋友表：id自增，name用于搜索
-  friends: '++id, name, color, tag, createdAt', 
+  // 1. friends: 增加 nickname
+  friends: '++id, name, nickname, color, tag, createdAt, isMaintenanceOn, maintenanceInterval, likes, dislikes', 
   
-  // 互动表：以后会用到
-  interactions: '++id, friendId, date, type' 
+  // 2. interactions: 保持不变
+  interactions: '++id, friendId, date, type, isMeetup',
+
+  // 3. 新增: memos (记忆碎片)
+  // friendId: 关联是谁的记忆, content: 内容
+  memos: '++id, friendId, content, createdAt' 
 });

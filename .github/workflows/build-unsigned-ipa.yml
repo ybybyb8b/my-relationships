@@ -3,11 +3,11 @@ name: Build Unsigned IPA for Sideloadly
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: # 允许手动点击按钮触发
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest # 必须用 Mac 环境
+    runs-on: macos-latest
 
     steps:
       - name: Checkout source
@@ -21,21 +21,28 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Build Web Assets (Vite)
+      - name: Build Web Assets
         run: npm run build
 
-      # === 初始化 iOS 环境 ===
-      # 注意：因为你是 Windows，仓库里可能没有 ios 文件夹
-      # 我们让 CI 现场生成一个
-      - name: Add iOS Platform & Generate Icons
+      # === 增强版：一步步初始化 iOS ===
+      - name: Setup iOS Project & Icons
         run: |
           npm install @capacitor/ios
           npx cap add ios
-          npx capacitor-assets generate --ios
+          
+          # 尝试生成图标，如果没图也不要报错挂掉 (|| true)
+          # 这样至少能打出包来，只是图标是默认的
+          npx capacitor-assets generate --ios || echo "⚠️ Warning: Icon generation failed, using default icon."
+          
           npx cap sync
 
-      # === 核心步骤：生成无签名 App ===
-      # 使用 xcodebuild 生成 .app 文件，并强制关闭签名校验
+      # === 新增：强制安装 CocoaPods 依赖 ===
+      # 这是解决大部分 iOS 构建莫名失败的万能药
+      - name: Install CocoaPods
+        run: |
+          cd ios/App
+          pod install
+
       - name: Build Unsigned .app
         run: |
           cd ios/App
@@ -49,19 +56,13 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      # === 打包成 IPA ===
-      # Sideloadly 需要标准的 IPA 结构：Payload/App.app
       - name: Package into IPA
         run: |
           cd ios/App
           mkdir Payload
-          # 把生成的 .app 移动到 Payload 文件夹
           cp -r derivedData/Build/Products/Release-iphoneos/App.app Payload/
-          # 压缩成 .ipa
           zip -r DeepRelations.ipa Payload
 
-      # === 上传结果 ===
-      # 跑完后你能在 GitHub 页面下载这个文件
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:

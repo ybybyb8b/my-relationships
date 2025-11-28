@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
@@ -27,10 +27,11 @@ jobs:
       # === 初始化 iOS 环境 ===
       # 注意：因为你是 Windows，仓库里可能没有 ios 文件夹
       # 我们让 CI 现场生成一个
-      - name: Add iOS Platform
+      - name: Add iOS Platform & Generate Icons
         run: |
           npm install @capacitor/ios
           npx cap add ios
+          npx capacitor-assets generate --ios
           npx cap sync
 
       # === 核心步骤：生成无签名 App ===
@@ -62,7 +63,7 @@ jobs:
       # === 上传结果 ===
       # 跑完后你能在 GitHub 页面下载这个文件
       - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: DeepRelations-Unsigned
           path: ios/App/DeepRelations.ipa

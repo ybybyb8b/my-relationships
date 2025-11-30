@@ -1,72 +1,72 @@
-name: Build Unsigned IPA for Sideloadly
+name: Build iOS IPA for Sideloadly
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: macos-latest
+  build-ios:
+    runs-on: macos-13
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Build Web Assets
-        run: npm run build
+      # 安装图标生成工具
+      - name: Install Asset Generator
+        run: npm install @capacitor/assets --save-dev
 
-      - name: Setup iOS Project
+      - name: Build React App
         run: |
-          npm install @capacitor/ios
+          npm run build
+          ls -F dist/ || echo "Warning: dist folder missing!"
+
+      - name: Update CocoaPods
+        run: |
+          gem install cocoapods
+
+      # 初始化 iOS 环境
+      - name: Add & Sync iOS Platform
+        run: |
           npx cap add ios
-          # 尝试生成图标，失败了也不要停 (|| true)
-          npx capacitor-assets generate --ios || true
-          npx cap sync
+          npx cap sync ios
 
-      # === 核弹级修复：暴力修改项目文件，禁用签名 ===
-      # 直接修改 project.pbxproj 文件，把签名要求强行改成 NO
-      - name: Force Disable Signing
+      # ✨ 新增步骤：自动生成 iOS 图标
+      # 它会读取根目录下的 assets/icon.png
+      - name: Generate App Icon
         run: |
-          cd ios/App
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' App.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' App.xcodeproj/project.pbxproj
+          npx capacitor-assets generate --ios --iconBackgroundColor "#d8d3cd" --splashBackgroundColor "#d8d3cd"
 
-      - name: Install CocoaPods
+      # 编译 IPA
+      - name: Build Unsigned IPA
         run: |
           cd ios/App
           pod install
-
-      # === 构建步骤：移除了一些复杂的参数，因为上面已经改了配置 ===
-      - name: Build Unsigned .app
-        run: |
-          cd ios/App
+          
           xcodebuild build \
             -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath derivedData
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_IDENTITY="" \
+            -quiet
 
-      - name: Package into IPA
-        run: |
-          cd ios/App
-          mkdir Payload
-          # 移动 .app 文件
-          cp -r derivedData/Build/Products/Release-iphoneos/App.app Payload/
-          # 压缩
-          zip -r DeepRelations.ipa Payload
+          mkdir -p Payload
+          mv build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r MyRelations.ipa Payload
 
-      - name: Upload IPA Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: DeepRelations-Unsigned
-          path: ios/App/DeepRelations.ipa
+          name: RMyRelations-Unsigned
+          path: ios/App/MyRelations.ipa

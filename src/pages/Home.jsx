@@ -3,143 +3,290 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import FriendCard from "../components/FriendCard";
 import AddFriendModal from "../components/AddFriendModal";
-import AddInteractionModal from "../components/AddInteractionModal"; // 引入
-import { Plus, Search, AlertCircle, UserPlus, CalendarPlus } from "lucide-react";
-import { cn } from "../lib/utils";
+import AddInteractionModal from "../components/AddInteractionModal"; 
+import { Plus, Search, UserPlus, CalendarPlus, Cake, ArrowUpDown, Check, History, Sparkles, Coffee, Bell, X } from "lucide-react"; 
+import { cn, THEME_COLORS } from "../lib/utils";
 
 export default function Home() {
   const [isFriendModalOpen, setIsFriendModalOpen] = useState(false);
-  const [isInteractionModalOpen, setIsInteractionModalOpen] = useState(false); // 记账弹窗
-  const [isActionSheetOpen, setIsActionSheetOpen] = useState(false); // 菜单开关
+  const [isInteractionModalOpen, setIsInteractionModalOpen] = useState(false); 
+  const [isActionSheetOpen, setIsActionSheetOpen] = useState(false); 
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(""); 
+  const [sortType, setSortType] = useState('date');
+
+  // 我们移除 showOverdueAlert 状态，因为现在是具体的卡片流，用户如果不喜欢可以滑过去
+  // 或者如果你想保留关闭功能，那是针对单张卡片的，这里暂时简化为展示所有建议
 
   const friends = useLiveQuery(() => db.friends.orderBy('createdAt').reverse().toArray());
   const interactions = useLiveQuery(() => db.interactions.toArray());
+  const memos = useLiveQuery(() => db.memos.toArray());
 
-  const processedFriends = useMemo(() => {
-    if (!friends || !interactions) return [];
+  const processedData = useMemo(() => {
+    if (!friends || !interactions || !memos) return { list: [], birthdays: [], flashbacks: [], overdueFriends: [] };
+
     const lastSeenMap = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // --- 1. Flashback 计算 ---
+    const flashbacks = [];
     interactions.forEach(record => {
+      const d = record.date;
+      if (d.getMonth() === today.getMonth() && d.getDate() === today.getDate() && d.getFullYear() < today.getFullYear()) {
+        const friend = friends.find(f => f.id === record.friendId);
+        if (friend) flashbacks.push({ record, friend, yearsAgo: today.getFullYear() - d.getFullYear() });
+      }
       const isValidMeetup = record.type === 'meetup' && record.isMeetup !== false;
       if (isValidMeetup) {
         const currentLast = lastSeenMap[record.friendId];
-        if (!currentLast || record.date > currentLast) {
-          lastSeenMap[record.friendId] = record.date;
-        }
+        if (!currentLast || record.date > currentLast) lastSeenMap[record.friendId] = record.date;
       }
     });
 
-    return friends.map(friend => {
+    const memoMap = {};
+    memos.forEach(m => {
+      if (!memoMap[m.friendId]) memoMap[m.friendId] = "";
+      memoMap[m.friendId] += m.content.toLowerCase() + " ";
+    });
+
+    // --- 2. 遍历计算状态 ---
+    const fullList = friends.map(friend => {
       const lastSeenDate = lastSeenMap[friend.id] || (friend.metAt ? new Date(friend.metAt) : null);
       let status = "normal"; 
       let daysDiff = -1;
 
       if (lastSeenDate) {
-        const diffTime = new Date().getTime() - lastSeenDate.getTime();
+        const diffTime = today.getTime() - lastSeenDate.getTime();
         daysDiff = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       }
 
+      // 判定逾期逻辑
       if (friend.isMaintenanceOn && friend.maintenanceInterval) {
-        if (daysDiff >= 0 && daysDiff > friend.maintenanceInterval) {
-          status = "overdue"; 
-        } else {
-          status = "safe"; 
-        }
+        if (daysDiff >= 0 && daysDiff > friend.maintenanceInterval) status = "overdue"; 
+        else status = "safe"; 
       } else if (friend.isMaintenanceOn && !lastSeenDate) {
         status = "overdue";
       }
 
-      return { ...friend, lastSeenDate, daysDiff, status };
-    }).filter(f => {
-      if (!searchTerm) return true;
-      const lowerTerm = searchTerm.toLowerCase();
-      return (
-        f.name.toLowerCase().includes(lowerTerm) || 
-        (f.tag && f.tag.toLowerCase().includes(lowerTerm))
-      );
+      let daysUntilBirthday = 999;
+      if (friend.birthday && friend.birthday.month && friend.birthday.day) {
+        const currentYear = today.getFullYear();
+        let nextBday = new Date(currentYear, friend.birthday.month - 1, friend.birthday.day);
+        if (nextBday < today) nextBday.setFullYear(currentYear + 1);
+        const diffTime = nextBday - today;
+        daysUntilBirthday = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      const searchableString = [friend.name, friend.nickname, friend.tag, friend.likes, friend.dislikes, memoMap[friend.id] || ""].join(" ").toLowerCase();
+      return { ...friend, lastSeenDate, daysDiff, status, daysUntilBirthday, searchableString };
     });
-  }, [friends, interactions, searchTerm]);
+
+    const filteredList = fullList.filter(f => !searchTerm || f.searchableString.includes(searchTerm.toLowerCase()));
+    
+    // 生日
+    const upcomingBirthdays = fullList
+      .filter(f => f.daysUntilBirthday >= 0 && f.daysUntilBirthday <= 30)
+      .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
+
+    // 逾期名单 (按逾期天数倒序，最久没见的排前面)
+    const overdueFriends = fullList
+      .filter(f => f.status === 'overdue')
+      .sort((a, b) => b.daysDiff - a.daysDiff);
+
+    return { list: filteredList, birthdays: upcomingBirthdays, flashbacks, overdueFriends };
+  }, [friends, interactions, memos, searchTerm]);
 
   const sortedFriends = useMemo(() => {
-    return [...processedFriends].sort((a, b) => {
-      if (a.status === 'overdue' && b.status !== 'overdue') return -1;
-      if (a.status !== 'overdue' && b.status === 'overdue') return 1;
-      return 0; 
-    });
-  }, [processedFriends]);
+    const list = [...processedData.list];
+    switch (sortType) {
+      case 'birthday': return list.sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
+      case 'interaction': return list.sort((a, b) => {
+          const dateA = a.lastSeenDate ? a.lastSeenDate.getTime() : 0;
+          const dateB = b.lastSeenDate ? b.lastSeenDate.getTime() : 0;
+          return dateB - dateA;
+        });
+      case 'date': default: return list.sort((a, b) => b.createdAt - a.createdAt);
+    }
+  }, [processedData.list, sortType]);
+
+  const sortOptions = [
+    { id: 'date', label: '最近加入' },
+    { id: 'birthday', label: '最近生日' },
+    { id: 'interaction', label: '最近互动' },
+  ];
+
+  // === 组合 Insights 数据流 ===
+  // 我们把 Flashbacks 和 OverdueFriends 合并成一个数组，Flashback 优先
+  const insights = [
+    ...processedData.flashbacks.map(fb => ({ type: 'flashback', data: fb })),
+    ...processedData.overdueFriends.map(f => ({ type: 'overdue', data: f }))
+  ];
 
   return (
     <div className="min-h-screen w-full bg-[#FAFAF9] dark:bg-black pb-32">
       
       {/* 标题栏 */}
-      <header className="px-6 pt-14 pb-4 sticky top-0 z-20 bg-[#FAFAF9]/90 dark:bg-black/90 backdrop-blur-sm transition-colors">
+      <header className="px-6 pt-14 pb-4 sticky top-0 z-20 bg-[#FAFAF9]/95 dark:bg-black/95 backdrop-blur-md transition-colors">
         <div className="flex justify-between items-end mb-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-tight">朋友</h1>
-            <p className="text-gray-400 dark:text-gray-500 text-sm mt-1 font-medium">
-              {sortedFriends.length} 位好友
-            </p>
+            <div className="relative mt-1">
+              <button 
+                onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
+                className="flex items-center gap-1.5 text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-blue-500 transition-colors"
+              >
+                <span>{sortedFriends.length} 位</span>
+                <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
+                <ArrowUpDown size={12} />
+                <span>{sortOptions.find(o => o.id === sortType).label}</span>
+              </button>
+              {isSortMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30 cursor-default" onClick={() => setIsSortMenuOpen(false)} />
+                  <div className="absolute top-8 left-0 z-40 bg-white dark:bg-[#1C1C1E] rounded-xl shadow-xl border border-gray-100 dark:border-white/10 p-1.5 min-w-[140px] animate-in slide-in-from-top-2 fade-in duration-200">
+                    {sortOptions.map(option => (
+                      <button key={option.id} onClick={() => { setSortType(option.id); setIsSortMenuOpen(false); }} className={cn("w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors", sortType === option.id ? "bg-gray-50 dark:bg-white/10 text-blue-600 dark:text-blue-400 font-bold" : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5")}>
+                        {option.label}
+                        {sortType === option.id && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-          
-          <button 
-            onClick={() => setIsActionSheetOpen(!isActionSheetOpen)}
-            className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all",
-              isActionSheetOpen ? "bg-gray-200 text-gray-600 rotate-45" : "bg-black dark:bg-white text-white dark:text-black"
-            )}
-          >
+          <button onClick={() => setIsActionSheetOpen(!isActionSheetOpen)} className={cn("w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all", isActionSheetOpen ? "bg-gray-200 text-gray-600 rotate-45" : "bg-black dark:bg-white text-white dark:text-black")}>
             <Plus size={22} />
           </button>
-
-          {/* === 悬浮菜单 === */}
           {isActionSheetOpen && (
-            <div className="absolute top-16 right-6 bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-2 min-w-[160px] animate-in slide-in-from-top-2 fade-in duration-200 z-50">
-              <button 
-                onClick={() => { setIsFriendModalOpen(true); setIsActionSheetOpen(false); }}
-                className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/10 rounded-xl transition-colors text-left"
-              >
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                  <UserPlus size={16} />
-                </div>
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">添加朋友</span>
-              </button>
-              
-              <button 
-                onClick={() => { setIsInteractionModalOpen(true); setIsActionSheetOpen(false); }}
-                className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/10 rounded-xl transition-colors text-left"
-              >
-                <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 flex items-center justify-center">
-                  <CalendarPlus size={16} />
-                </div>
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">记录活动</span>
-              </button>
-            </div>
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsActionSheetOpen(false)} />
+              <div className="absolute top-16 right-6 bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-2 min-w-[160px] animate-in slide-in-from-top-2 fade-in duration-200 z-50">
+                <button onClick={() => { setIsFriendModalOpen(true); setIsActionSheetOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/10 rounded-xl transition-colors text-left"><div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center"><UserPlus size={16} /></div><span className="text-sm font-bold text-gray-700 dark:text-gray-200">添加朋友</span></button>
+                <button onClick={() => { setIsInteractionModalOpen(true); setIsActionSheetOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/10 rounded-xl transition-colors text-left"><div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 flex items-center justify-center"><CalendarPlus size={16} /></div><span className="text-sm font-bold text-gray-700 dark:text-gray-200">记录活动</span></button>
+              </div>
+            </>
           )}
-          {/* 点击外部关闭菜单的遮罩 */}
-          {isActionSheetOpen && <div className="fixed inset-0 z-40" onClick={() => setIsActionSheetOpen(false)} />}
         </div>
-
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input 
-            type="text" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="搜索名字或标签..." 
-            className="w-full h-10 bg-white dark:bg-white/10 rounded-xl pl-10 pr-4 text-sm outline-none border border-gray-100 dark:border-white/5 focus:border-blue-400 transition-colors shadow-sm"
-          />
+          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="搜索名字、喜好、记忆..." className="w-full h-10 bg-white dark:bg-white/10 rounded-xl pl-10 pr-4 text-sm outline-none border border-gray-200 dark:border-white/5 focus:border-blue-400 transition-colors shadow-sm" />
         </div>
       </header>
 
-      {sortedFriends.some(f => f.status === 'overdue') && (
-        <div className="px-6 mb-4 animate-in slide-in-from-top-2">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl p-3 flex items-center gap-3 text-red-600 dark:text-red-400">
-            <AlertCircle size={18} />
-            <span className="text-xs font-bold">有朋友很久没联系了，快去看看！</span>
+      {/* === 情报流 (Horizontal Scroll Deck) === */}
+      {/* 只有在无搜索词，且有内容时显示 */}
+      {!searchTerm && insights.length > 0 && (
+        <div className="mb-6 animate-in slide-in-from-top-2">
+          {/* 横向滚动容器 */}
+          <div className="flex gap-3 px-6 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory">
+            
+            {/* 遍历 insights 数组 */}
+            {insights.map((item, idx) => {
+              // 1. 那年今日卡片
+              if (item.type === 'flashback') {
+                const fb = item.data;
+                return (
+                  <div key={`fb-${idx}`} className="flex-shrink-0 w-[85vw] sm:w-[340px] snap-center">
+                    <div className="relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-md border border-yellow-200/50 dark:border-yellow-500/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between">
+                      {/* 图标头 */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 bg-yellow-100 dark:bg-yellow-500/20 rounded-full text-yellow-600 dark:text-yellow-400">
+                          <History size={16} />
+                        </div>
+                        <span className="text-[10px] font-bold text-yellow-600/80 dark:text-yellow-500 uppercase tracking-widest">Flashback</span>
+                      </div>
+                      {/* 内容 */}
+                      <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed font-hand">
+                        <span className="font-bold text-lg mx-1">{fb.yearsAgo}</span> 年前的今天，
+                        你和 <span className="font-bold text-gray-900 dark:text-white mx-1">{fb.friend.name}</span> 
+                        {fb.record.title ? ` ${fb.record.title}` : " 曾有过互动"}。
+                      </p>
+                      <Sparkles className="absolute -right-2 -bottom-2 text-yellow-400/20 rotate-12" size={60} />
+                    </div>
+                  </div>
+                );
+              }
+
+              // 2. 好久不见卡片 (Overdue)
+              if (item.type === 'overdue') {
+                const f = item.data;
+                const theme = THEME_COLORS[f.color] || THEME_COLORS.default;
+                return (
+                  <div key={`od-${f.id}`} className="flex-shrink-0 w-[85vw] sm:w-[340px] snap-center">
+                    <div className="relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-md border border-violet-200/50 dark:border-violet-500/10 rounded-2xl p-4 shadow-sm h-full flex items-center gap-4">
+                      
+                      {/* 左侧：大头像 */}
+                      <div className={cn("w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-inner flex-shrink-0", theme.photo)}>
+                        {f.photo ? (
+                          <img src={f.photo} className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <span className="font-bold opacity-60">{f.name?.[0]}</span>
+                        )}
+                      </div>
+
+                      {/* 右侧：信息 */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider bg-violet-50 dark:bg-violet-900/20 px-1.5 py-0.5 rounded">好久不见</span>
+                        </div>
+                        <p className="text-base font-bold text-gray-800 dark:text-gray-100 truncate">{f.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          已经 <span className="font-bold text-violet-500">{f.daysDiff}</span> 天没联系了
+                        </p>
+                      </div>
+
+                      {/* 装饰图标 */}
+                      <div className="absolute right-[-10px] bottom-[-10px] opacity-10 rotate-12 pointer-events-none">
+                        <Coffee size={80} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })}
           </div>
         </div>
       )}
 
+      {/* === 近期生日 (Banner) === */}
+      {/* 保持原样，因为它本身就是紧凑的横向滚动，不占用太多高度 */}
+      {processedData.birthdays.length > 0 && !searchTerm && (
+        <div className="mb-4 animate-in slide-in-from-top-4">
+          <div className="px-6 flex items-center gap-2 mb-2">
+            <Cake size={14} className="text-rose-400" />
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">近期生日</span>
+          </div>
+          <div className="flex gap-3 px-6 overflow-x-auto no-scrollbar pb-2">
+            {processedData.birthdays.map(friend => {
+              const theme = THEME_COLORS[friend.color] || THEME_COLORS.default;
+              return (
+                <div key={friend.id} className="flex-shrink-0 relative group">
+                  <div className="bg-white dark:bg-[#1C1C1E] p-2 pr-4 rounded-full border border-gray-100 dark:border-white/10 shadow-sm flex items-center gap-3">
+                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-inner", theme.photo)}>
+                      {friend.photo ? (
+                        <img src={friend.photo} className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        <span className="font-bold opacity-60">{friend.name?.[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-800 dark:text-gray-100">{friend.name}</p>
+                      <p className="text-[10px] font-medium text-rose-500">
+                        {friend.daysUntilBirthday === 0 ? "今天生日！" : `${friend.daysUntilBirthday} 天后`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 列表区域 */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 px-6 mt-2">
         {sortedFriends.length === 0 ? (
           <div className="col-span-2 py-24 text-center text-gray-300">
@@ -147,7 +294,7 @@ export default function Home() {
                {searchTerm ? "🔍" : "+"}
              </div>
              <p className="text-sm font-medium">
-               {searchTerm ? "没找到相关朋友" : "添加一个朋友"}
+               {searchTerm ? "没有找到相关记忆" : "添加一个朋友"}
              </p>
           </div>
         ) : (
@@ -155,6 +302,7 @@ export default function Home() {
             <div key={friend.id} className="relative group">
               <FriendCard friend={friend} />
               
+              {/* 卡片右上角的状态胶囊 (依然保留，作为列表里的快速指示) */}
               {friend.daysDiff >= 0 && (
                 <div className={cn(
                   "absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm backdrop-blur-md border flex items-center gap-1 z-10 transition-all",
@@ -177,16 +325,8 @@ export default function Home() {
         )}
       </div>
 
-      <AddFriendModal 
-        isOpen={isFriendModalOpen} 
-        onClose={() => setIsFriendModalOpen(false)} 
-      />
-
-      <AddInteractionModal
-        isOpen={isInteractionModalOpen}
-        onClose={() => setIsInteractionModalOpen(false)}
-        // 不传 friendId，表示多选模式
-      />
+      <AddFriendModal isOpen={isFriendModalOpen} onClose={() => setIsFriendModalOpen(false)} />
+      <AddInteractionModal isOpen={isInteractionModalOpen} onClose={() => setIsInteractionModalOpen(false)} />
     </div>
   );
 }

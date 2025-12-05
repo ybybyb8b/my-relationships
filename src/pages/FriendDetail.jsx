@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react"; // <--- 修复点：补上了 useMemo
 import { useParams, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
-import { ArrowLeft, Calendar, Clock, Gift, Pencil, MapPin, Heart, Zap, Bell, StickyNote, Plus, Trash2 } from "lucide-react"; 
+import { ArrowLeft, Calendar, Clock, Gift, Pencil, MapPin, Heart, Zap, Bell, StickyNote, Trash2, Scale } from "lucide-react"; 
 import { cn, THEME_COLORS } from "../lib/utils";
 import AddInteractionModal from "../components/AddInteractionModal";
 import AddFriendModal from "../components/AddFriendModal";
@@ -14,7 +14,6 @@ export default function FriendDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingInteraction, setEditingInteraction] = useState(null);
   
-  // 新增：Memos 状态
   const [newMemo, setNewMemo] = useState("");
   const [isAddingMemo, setIsAddingMemo] = useState(false);
 
@@ -23,11 +22,28 @@ export default function FriendDetail() {
     () => db.interactions.where('friendId').equals(Number(id)).reverse().sortBy('date'),
     [id]
   );
-  // 获取 Memos
   const memos = useLiveQuery(
     () => db.memos.where('friendId').equals(Number(id)).reverse().sortBy('createdAt'),
     [id]
   );
+
+  // === 人情账本计算 ===
+  const balanceData = useMemo(() => {
+    if (!interactions) return { val: 0, text: "计算中...", color: "text-gray-500" };
+    let total = 0;
+    interactions.forEach(item => {
+      const price = item.price ? Number(item.price) : 0;
+      if (price === 0) return;
+      if (item.giftDirection === 'out' || item.splitType === 'me') {
+        total += price;
+      } else if (item.giftDirection === 'in' || item.splitType === 'they') {
+        total -= price;
+      }
+    });
+    if (total > 0) return { val: total, label: "我付出更多", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" };
+    else if (total < 0) return { val: Math.abs(total), label: "Ta付出更多", color: "text-orange-500 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-900/20" };
+    else return { val: 0, label: "扯平", color: "text-gray-500 dark:text-gray-400", bg: "bg-gray-100 dark:bg-white/5" };
+  }, [interactions]);
 
   if (!friend) return null;
 
@@ -66,7 +82,6 @@ export default function FriendDetail() {
     setTimeout(() => setEditingInteraction(null), 300);
   };
 
-  // === Memo 操作 ===
   const handleAddMemo = async (e) => {
     e.preventDefault();
     if (!newMemo.trim()) return;
@@ -99,13 +114,15 @@ export default function FriendDetail() {
           <ArrowLeft size={22} className={theme.text} />
         </button>
 
-        <button 
-          onClick={() => setIsEditModalOpen(true)}
-          className={cn("px-4 py-2 rounded-full bg-white/40 dark:bg-black/20 backdrop-blur-md hover:bg-white/60 transition-all active:scale-95 flex items-center gap-2 text-sm font-bold", theme.text)}
-        >
-          <Pencil size={16} />
-          编辑
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            className={cn("px-4 py-2 rounded-full bg-white/40 dark:bg-black/20 backdrop-blur-md hover:bg-white/60 transition-all active:scale-95 flex items-center gap-2 text-sm font-bold", theme.text)}
+          >
+            <Pencil size={16} />
+            编辑
+          </button>
+        </div>
       </div>
 
       <div className="relative z-10 flex flex-col items-center mt-6 px-6 pb-32">
@@ -131,10 +148,9 @@ export default function FriendDetail() {
 
         {/* 名字 & 昵称 */}
         <div className="mt-6 text-center">
-          <h1 className={cn("text-4xl font-bold tracking-tight font-hand", theme.text)}>
+          <h1 className={cn("text-4xl font-bold tracking-tight text-center font-hand", theme.text)}>
             {friend.name}
           </h1>
-          {/* 新增：显示昵称 */}
           {friend.nickname && (
             <p className={cn("text-lg font-hand opacity-70 mt-1", theme.text)}>
               "{friend.nickname}"
@@ -158,8 +174,10 @@ export default function FriendDetail() {
           )}
         </div>
 
-        {/* 统计卡片 */}
-        <div className="w-full max-w-sm mt-8 space-y-4">
+        {/* 统计卡片 (Birthday / Last Seen / Balance) */}
+        <div className="w-full max-w-sm mt-8 space-y-3">
+          
+          {/* Birthday */}
           <div className="group flex items-center p-4 bg-white/60 dark:bg-white/10 backdrop-blur-md rounded-3xl border border-white/40 dark:border-white/5 shadow-sm">
             <div className="p-3 rounded-2xl bg-white/80 dark:bg-white/10 backdrop-blur-sm">
               <Calendar size={20} className={theme.text} />
@@ -170,6 +188,7 @@ export default function FriendDetail() {
             </div>
           </div>
 
+          {/* Last Seen */}
           <div className="flex items-center p-4 bg-white/60 dark:bg-white/10 backdrop-blur-md rounded-3xl border border-white/40 dark:border-white/5 shadow-sm">
              <div className="p-3 rounded-2xl bg-white/80 dark:bg-white/10 backdrop-blur-sm">
               <Clock size={20} className={theme.text} />
@@ -181,6 +200,27 @@ export default function FriendDetail() {
               </p>
             </div>
           </div>
+
+          {/* Balance */}
+          <div className="flex items-center p-4 bg-white/60 dark:bg-white/10 backdrop-blur-md rounded-3xl border border-white/40 dark:border-white/5 shadow-sm">
+             <div className="p-3 rounded-2xl bg-white/80 dark:bg-white/10 backdrop-blur-sm">
+              <Scale size={20} className={theme.text} />
+            </div>
+            <div className="ml-4 flex-1">
+              <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Balance</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                  {balanceData.label}
+                </p>
+                {balanceData.val > 0 && (
+                  <span className={cn("text-xs font-bold px-2 py-1 rounded-lg", balanceData.color, balanceData.bg)}>
+                    ¥{balanceData.val}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* 喜好与雷点 */}
@@ -207,7 +247,7 @@ export default function FriendDetail() {
           </div>
         )}
 
-        {/* === 新增：记忆碎片 (Memos) === */}
+        {/* Memos */}
         <div className="w-full max-w-sm mt-8">
           <div className="flex justify-between items-end mb-4 px-2">
             <h3 className="text-sm font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
@@ -218,7 +258,6 @@ export default function FriendDetail() {
             </button>
           </div>
 
-          {/* 新增输入框 */}
           {isAddingMemo && (
             <form onSubmit={handleAddMemo} className="mb-4 flex gap-2">
               <input 
@@ -235,7 +274,6 @@ export default function FriendDetail() {
             </form>
           )}
 
-          {/* 列表 */}
           <div className="space-y-2">
             {memos?.map(memo => (
               <div key={memo.id} className="group flex items-start gap-3 p-3 bg-yellow-50/50 dark:bg-yellow-900/10 rounded-xl border border-yellow-100/50 dark:border-yellow-500/10 hover:border-yellow-200 transition-colors">
@@ -265,11 +303,7 @@ export default function FriendDetail() {
            ) : (
              <div className="space-y-3">
                {interactions.map(item => (
-                 <div 
-                   key={item.id} 
-                   onClick={() => handleInteractionClick(item)}
-                   className="flex items-center p-4 bg-white dark:bg-white/10 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-98 transition-transform cursor-pointer"
-                 >
+                 <div key={item.id} onClick={() => handleInteractionClick(item)} className="flex items-center p-4 bg-white dark:bg-white/10 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm active:scale-98 transition-transform cursor-pointer">
                     <div className={cn("flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg", item.type === 'meetup' ? "bg-blue-50 text-blue-600" : (item.giftDirection === 'out' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"))}>
                        {item.type === 'meetup' ? <Calendar size={18}/> : <Gift size={18}/>}
                     </div>
@@ -286,9 +320,7 @@ export default function FriendDetail() {
                        </div>
                        <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400 dark:text-gray-400">
                           <span>{item.date.toLocaleDateString()}</span>
-                          {item.type === 'meetup' && item.isMeetup !== false && (
-                            <MapPin size={10} className="text-blue-400" />
-                          )}
+                          {item.type === 'meetup' && item.isMeetup !== false && (<MapPin size={10} className="text-blue-400" />)}
                           {item.type === 'gift' && (<span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10">{item.giftDirection === 'out' ? '送出' : '收到'}</span>)}
                           {item.type === 'meetup' && item.splitType && (<span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10">{item.splitType === 'me' ? '我买单' : ''}{item.splitType === 'aa' ? 'AA制' : ''}{item.splitType === 'they' ? 'Ta请客' : ''}</span>)}
                        </div>

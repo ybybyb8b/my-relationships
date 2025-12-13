@@ -1,10 +1,8 @@
-// src/components/FriendCard.jsx
 import { Link } from "react-router-dom";
-import { cn, getThemeStyles } from "../lib/utils"; // 引入新的工具函数
+import { cn, getThemeStyles } from "../lib/utils"; 
 import { Pin } from "lucide-react"; 
 
 export default function FriendCard({ friend }) {
-  // 使用新的函数获取样式配置
   const styles = getThemeStyles(friend.color || 'default');
 
   const getBirthdayString = () => {
@@ -33,28 +31,35 @@ export default function FriendCard({ friend }) {
         </div>
       )}
 
-      {/* 这里我们同时应用 class 和 style。
-         如果是预设，class 会生效，style 是空对象。
-         如果是自定义，class 为空（或默认），style 会生效。
-      */}
+      {/* === 修改区域 === */}
       <div 
         className={cn(
           "relative w-full rounded-lg shadow-md overflow-hidden flex flex-col",
-          styles.paperClass, // 预设类名
+          // 1. 基础过渡
+          "transition-all duration-500 ease-in-out",
+          // 2. 深色模式滤镜：只降低亮度到 0.8，不加任何黄色调
+          "dark:brightness-[0.8]", 
+          // 3. 悬停交互：悬停时恢复 100% 亮度，产生“点亮”效果
+          "dark:hover:brightness-100", 
+          // 4. 边框微调：深色下加一个淡淡的白边，增加层次感
+          "dark:border dark:border-white/10",
+          
+          styles.paperClass, 
           friend.isPinned && "ring-2 ring-offset-2 ring-red-100 dark:ring-red-900"
         )}
-        style={styles.paperStyle} // 自定义样式
+        style={styles.paperStyle}
       >
         
         <div className="p-3 pb-0">
           <div 
             className={cn(
               "aspect-square w-full rounded-sm overflow-hidden flex items-center justify-center relative",
-              styles.photoClass, // 预设类名
+              styles.photoClass,
               "shadow-inner"
             )}
-            style={styles.photoStyle} // 自定义样式
+            style={styles.photoStyle}
           >
+            {/* 噪点纹理 */}
             <div className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] pointer-events-none"></div>
 
             {friend.photo ? (

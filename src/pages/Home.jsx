@@ -15,9 +15,6 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState(""); 
   const [sortType, setSortType] = useState('date');
 
-  // 我们移除 showOverdueAlert 状态，因为现在是具体的卡片流，用户如果不喜欢可以滑过去
-  // 或者如果你想保留关闭功能，那是针对单张卡片的，这里暂时简化为展示所有建议
-
   const friends = useLiveQuery(() => db.friends.orderBy('createdAt').reverse().toArray());
   const interactions = useLiveQuery(() => db.interactions.toArray());
   const memos = useLiveQuery(() => db.memos.toArray());
@@ -29,7 +26,7 @@ export default function Home() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // --- 1. Flashback 计算 ---
+    // --- 1. Flashback 计算 (保持不变) ---
     const flashbacks = [];
     interactions.forEach(record => {
       const d = record.date;
@@ -50,7 +47,7 @@ export default function Home() {
       memoMap[m.friendId] += m.content.toLowerCase() + " ";
     });
 
-    // --- 2. 遍历计算状态 ---
+    // --- 2. 遍历计算状态 (保持不变) ---
     const fullList = friends.map(friend => {
       const lastSeenDate = lastSeenMap[friend.id] || (friend.metAt ? new Date(friend.metAt) : null);
       let status = "normal"; 
@@ -61,7 +58,6 @@ export default function Home() {
         daysDiff = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       }
 
-      // 判定逾期逻辑
       if (friend.isMaintenanceOn && friend.maintenanceInterval) {
         if (daysDiff >= 0 && daysDiff > friend.maintenanceInterval) status = "overdue"; 
         else status = "safe"; 
@@ -84,12 +80,10 @@ export default function Home() {
 
     const filteredList = fullList.filter(f => !searchTerm || f.searchableString.includes(searchTerm.toLowerCase()));
     
-    // 生日
     const upcomingBirthdays = fullList
       .filter(f => f.daysUntilBirthday >= 0 && f.daysUntilBirthday <= 30)
       .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
 
-    // 逾期名单 (按逾期天数倒序，最久没见的排前面)
     const overdueFriends = fullList
       .filter(f => f.status === 'overdue')
       .sort((a, b) => b.daysDiff - a.daysDiff);
@@ -116,15 +110,13 @@ export default function Home() {
     { id: 'interaction', label: '最近互动' },
   ];
 
-  // === 组合 Insights 数据流 ===
-  // 我们把 Flashbacks 和 OverdueFriends 合并成一个数组，Flashback 优先
   const insights = [
     ...processedData.flashbacks.map(fb => ({ type: 'flashback', data: fb })),
     ...processedData.overdueFriends.map(f => ({ type: 'overdue', data: f }))
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#FAFAF9] dark:bg-black pb-32">
+    <div className="min-h-screen w-full bg-[#FAFAF9] dark:bg-black pb-32 transition-colors duration-500">
       
       {/* 标题栏 */}
       <header className="px-6 pt-14 pb-4 sticky top-0 z-20 bg-[#FAFAF9]/95 dark:bg-black/95 backdrop-blur-md transition-colors">
@@ -163,61 +155,68 @@ export default function Home() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsActionSheetOpen(false)} />
               <div className="absolute top-16 right-6 bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-2 min-w-[160px] animate-in slide-in-from-top-2 fade-in duration-200 z-50">
-                <button onClick={() => { setIsFriendModalOpen(true); setIsActionSheetOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/10 rounded-xl transition-colors text-left"><div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center"><UserPlus size={16} /></div><span className="text-sm font-bold text-gray-700 dark:text-gray-200">添加朋友</span></button>
-                <button onClick={() => { setIsInteractionModalOpen(true); setIsActionSheetOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/10 rounded-xl transition-colors text-left"><div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 flex items-center justify-center"><CalendarPlus size={16} /></div><span className="text-sm font-bold text-gray-700 dark:text-gray-200">记录活动</span></button>
+                {/* 优化后的深色模式图标背景：更淡雅，不突兀 */}
+                <button onClick={() => { setIsFriendModalOpen(true); setIsActionSheetOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-left">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <UserPlus size={16} />
+                  </div>
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-200">添加朋友</span>
+                </button>
+                <button onClick={() => { setIsInteractionModalOpen(true); setIsActionSheetOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-left">
+                  <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center">
+                    <CalendarPlus size={16} />
+                  </div>
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-200">记录活动</span>
+                </button>
               </div>
             </>
           )}
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="搜索名字、喜好、记忆..." className="w-full h-10 bg-white dark:bg-white/10 rounded-xl pl-10 pr-4 text-sm outline-none border border-gray-200 dark:border-white/5 focus:border-blue-400 transition-colors shadow-sm" />
+          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="搜索名字、喜好、记忆..." className="w-full h-10 bg-white dark:bg-white/10 rounded-xl pl-10 pr-4 text-sm outline-none border border-gray-200 dark:border-white/5 focus:border-blue-400 transition-colors shadow-sm text-gray-800 dark:text-white placeholder:text-gray-400/70" />
         </div>
       </header>
 
       {/* === 情报流 (Horizontal Scroll Deck) === */}
-      {/* 只有在无搜索词，且有内容时显示 */}
       {!searchTerm && insights.length > 0 && (
         <div className="mb-6 animate-in slide-in-from-top-2">
-          {/* 横向滚动容器 */}
           <div className="flex gap-3 px-6 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory">
             
-            {/* 遍历 insights 数组 */}
             {insights.map((item, idx) => {
-              // 1. 那年今日卡片
+              // 1. 那年今日卡片 (Flashback) - 深色模式优化
               if (item.type === 'flashback') {
                 const fb = item.data;
                 return (
                   <div key={`fb-${idx}`} className="flex-shrink-0 w-[85vw] sm:w-[340px] snap-center">
-                    <div className="relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-md border border-yellow-200/50 dark:border-yellow-500/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between">
-                      {/* 图标头 */}
+                    <div className="relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-md border border-yellow-200/50 dark:border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between">
+                      {/* 深色下背景透明，只保留微弱光晕 */}
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1.5 bg-yellow-100 dark:bg-yellow-500/20 rounded-full text-yellow-600 dark:text-yellow-400">
+                        <div className="p-1.5 bg-yellow-100 dark:bg-yellow-500/10 rounded-full text-yellow-600 dark:text-yellow-400">
                           <History size={16} />
                         </div>
                         <span className="text-[10px] font-bold text-yellow-600/80 dark:text-yellow-500 uppercase tracking-widest">Flashback</span>
                       </div>
-                      {/* 内容 */}
-                      <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed font-hand">
-                        <span className="font-bold text-lg mx-1">{fb.yearsAgo}</span> 年前的今天，
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-hand">
+                        <span className="font-bold text-lg mx-1 text-gray-900 dark:text-white">{fb.yearsAgo}</span> 年前的今天，
                         你和 <span className="font-bold text-gray-900 dark:text-white mx-1">{fb.friend.name}</span> 
                         {fb.record.title ? ` ${fb.record.title}` : " 曾有过互动"}。
                       </p>
-                      <Sparkles className="absolute -right-2 -bottom-2 text-yellow-400/20 rotate-12" size={60} />
+                      {/* 深色模式下的 Sparkles 颜色减淡 */}
+                      <Sparkles className="absolute -right-2 -bottom-2 text-yellow-400/20 dark:text-yellow-200/10 rotate-12" size={60} />
                     </div>
                   </div>
                 );
               }
 
-              // 2. 好久不见卡片 (Overdue)
+              // 2. 好久不见卡片 (Overdue) - 深色模式优化
               if (item.type === 'overdue') {
                 const f = item.data;
                 const theme = THEME_COLORS[f.color] || THEME_COLORS.default;
                 return (
                   <div key={`od-${f.id}`} className="flex-shrink-0 w-[85vw] sm:w-[340px] snap-center">
-                    <div className="relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-md border border-violet-200/50 dark:border-violet-500/10 rounded-2xl p-4 shadow-sm h-full flex items-center gap-4">
+                    <div className="relative overflow-hidden bg-white/60 dark:bg-white/5 backdrop-blur-md border border-violet-200/50 dark:border-white/10 rounded-2xl p-4 shadow-sm h-full flex items-center gap-4">
                       
-                      {/* 左侧：大头像 */}
                       <div className={cn("w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-inner flex-shrink-0", theme.photo)}>
                         {f.photo ? (
                           <img src={f.photo} className="w-full h-full object-cover rounded-full" />
@@ -226,20 +225,20 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* 右侧：信息 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider bg-violet-50 dark:bg-violet-900/20 px-1.5 py-0.5 rounded">好久不见</span>
+                          {/* 深色模式下 Tag 背景变淡 */}
+                          <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 uppercase tracking-wider bg-violet-50 dark:bg-violet-500/10 px-1.5 py-0.5 rounded">好久不见</span>
                         </div>
                         <p className="text-base font-bold text-gray-800 dark:text-gray-100 truncate">{f.name}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          已经 <span className="font-bold text-violet-500">{f.daysDiff}</span> 天没联系了
+                          已经 <span className="font-bold text-violet-500 dark:text-violet-400">{f.daysDiff}</span> 天没联系了
                         </p>
                       </div>
-
-                      {/* 装饰图标 */}
-                      <div className="absolute right-[-10px] bottom-[-10px] opacity-10 rotate-12 pointer-events-none">
-                        <Coffee size={80} />
+                      
+                      {/* 装饰图标变淡 */}
+                      <div className="absolute right-[-10px] bottom-[-10px] opacity-10 dark:opacity-5 rotate-12 pointer-events-none">
+                        <Coffee size={80} className="dark:text-white" />
                       </div>
                     </div>
                   </div>
@@ -252,7 +251,6 @@ export default function Home() {
       )}
 
       {/* === 近期生日 (Banner) === */}
-      {/* 保持原样，因为它本身就是紧凑的横向滚动，不占用太多高度 */}
       {processedData.birthdays.length > 0 && !searchTerm && (
         <div className="mb-4 animate-in slide-in-from-top-4">
           <div className="px-6 flex items-center gap-2 mb-2">
@@ -264,7 +262,8 @@ export default function Home() {
               const theme = THEME_COLORS[friend.color] || THEME_COLORS.default;
               return (
                 <div key={friend.id} className="flex-shrink-0 relative group">
-                  <div className="bg-white dark:bg-[#1C1C1E] p-2 pr-4 rounded-full border border-gray-100 dark:border-white/10 shadow-sm flex items-center gap-3">
+                  {/* 深色模式：胶囊背景变 neutral，不再发白 */}
+                  <div className="bg-white dark:bg-white/5 p-2 pr-4 rounded-full border border-gray-100 dark:border-white/10 shadow-sm flex items-center gap-3">
                     <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-inner", theme.photo)}>
                       {friend.photo ? (
                         <img src={friend.photo} className="w-full h-full object-cover rounded-full" />
@@ -274,7 +273,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-gray-800 dark:text-gray-100">{friend.name}</p>
-                      <p className="text-[10px] font-medium text-rose-500">
+                      <p className="text-[10px] font-medium text-rose-500 dark:text-rose-400">
                         {friend.daysUntilBirthday === 0 ? "今天生日！" : `${friend.daysUntilBirthday} 天后`}
                       </p>
                     </div>
@@ -289,8 +288,8 @@ export default function Home() {
       {/* 列表区域 */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 px-6 mt-2">
         {sortedFriends.length === 0 ? (
-          <div className="col-span-2 py-24 text-center text-gray-300">
-             <div className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg flex items-center justify-center text-4xl mx-auto mb-4 opacity-50">
+          <div className="col-span-2 py-24 text-center text-gray-300 dark:text-gray-600">
+             <div className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-white/10 rounded-lg flex items-center justify-center text-4xl mx-auto mb-4 opacity-50">
                {searchTerm ? "🔍" : "+"}
              </div>
              <p className="text-sm font-medium">
@@ -302,15 +301,16 @@ export default function Home() {
             <div key={friend.id} className="relative group">
               <FriendCard friend={friend} />
               
-              {/* 卡片右上角的状态胶囊 (依然保留，作为列表里的快速指示) */}
+              {/* 卡片右上角的状态胶囊 (深色优化) */}
               {friend.daysDiff >= 0 && (
                 <div className={cn(
                   "absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm backdrop-blur-md border flex items-center gap-1 z-10 transition-all",
+                  // 这里的状态颜色也需要变柔和
                   friend.status === 'overdue' 
-                    ? "bg-red-100/90 text-red-600 border-red-200" 
+                    ? "bg-red-100/90 dark:bg-red-500/20 text-red-600 dark:text-red-300 border-red-200 dark:border-red-500/10" 
                     : friend.status === 'safe'
-                      ? "bg-green-100/90 text-green-700 border-green-200" 
-                      : "bg-white/80 text-gray-500 border-white/40" 
+                      ? "bg-green-100/90 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/10" 
+                      : "bg-white/80 dark:bg-white/20 text-gray-500 dark:text-gray-300 border-white/40 dark:border-white/10" 
                 )}>
                   <div className={cn(
                     "w-1.5 h-1.5 rounded-full",

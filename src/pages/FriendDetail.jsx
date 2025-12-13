@@ -40,6 +40,7 @@ export default function FriendDetail() {
         total -= price;
       }
     });
+    total = Number(total.toFixed(2));
     if (total > 0) return { val: total, label: "我付出更多", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" };
     else if (total < 0) return { val: Math.abs(total), label: "Ta付出更多", color: "text-orange-500 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-900/20" };
     else return { val: 0, label: "扯平", color: "text-gray-500 dark:text-gray-400", bg: "bg-gray-100 dark:bg-white/5" };

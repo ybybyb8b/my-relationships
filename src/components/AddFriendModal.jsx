@@ -1,36 +1,43 @@
+// src/components/AddFriendModal.jsx
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, User, Calendar, Tag, Sparkles, ChevronDown, Trash2, Camera, Bell, Check, Heart, Zap, Smile } from "lucide-react"; // 引入 Smile
+// 引入 Palette 图标
+import { X, User, Calendar, Tag, Sparkles, ChevronDown, Trash2, Camera, Bell, Check, Heart, Zap, Smile, Palette } from "lucide-react"; 
 import { db } from "../db";
-import { cn, processImage } from "../lib/utils";
+import { cn, processImage, THEME_COLORS } from "../lib/utils"; // 引入 THEME_COLORS 以获取预设列表
 
-const colors = ['blue', 'pink', 'green', 'yellow', 'purple', 'orange', 'teal', 'cyan', 'lime', 'indigo'];
+// 获取预设颜色的 key 数组
+const PRESET_COLORS = Object.keys(THEME_COLORS).filter(k => k !== 'default');
+
 const months = Array.from({ length: 12 }, (_, i) => i + 1);
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
 export default function AddFriendModal({ isOpen, onClose, initialData = null }) {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
-
+  // ... (其他状态保持不变)
   const [name, setName] = useState("");
-  const [nickname, setNickname] = useState(""); // 新增：昵称
+  const [nickname, setNickname] = useState("");
   const [tag, setTag] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [birthDay, setBirthDay] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [metAt, setMetAt] = useState(""); 
   const [photo, setPhoto] = useState(null); 
-
   const [isMaintenanceOn, setIsMaintenanceOn] = useState(false); 
   const [maintenanceInterval, setMaintenanceInterval] = useState(30); 
   const [likes, setLikes] = useState("");
   const [dislikes, setDislikes] = useState("");
 
+  // === 新增：颜色状态 ===
+  const [selectedColor, setSelectedColor] = useState('blue'); // 存储最终颜色值（可能是 'blue' 或 '#ffaabb'）
+  const [showColorPicker, setShowColorPicker] = useState(false); // 控制是否显示自定义取色器
+
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
+        // ... (其他回填逻辑保持不变)
         setName(initialData.name || "");
-        setNickname(initialData.nickname || ""); // 回填昵称
+        setNickname(initialData.nickname || "");
         setPhoto(initialData.photo || null);
         setTag(initialData.tag || "");
         
@@ -40,7 +47,8 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
         setBirthYear(b.year || "");
 
         if (initialData.metAt) {
-          try {
+           // ... (日期处理保持不变)
+           try {
             const dateObj = initialData.metAt instanceof Date ? initialData.metAt : new Date(initialData.metAt);
             if (!isNaN(dateObj.getTime())) setMetAt(dateObj.toISOString().split('T')[0]);
             else setMetAt("");
@@ -51,10 +59,14 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
         setMaintenanceInterval(initialData.maintenanceInterval || 30);
         setLikes(initialData.likes || "");
         setDislikes(initialData.dislikes || "");
+        
+        // 回填颜色
+        setSelectedColor(initialData.color || 'blue');
 
       } else {
+        // ... (重置逻辑)
         setName("");
-        setNickname(""); // 重置昵称
+        setNickname("");
         setPhoto(null);
         setTag("");
         setBirthMonth("");
@@ -65,6 +77,9 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
         setMaintenanceInterval(30);
         setLikes("");
         setDislikes("");
+        
+        // 默认随机一个预设色
+        setSelectedColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
       }
     }
   }, [isOpen, initialData]);
@@ -72,6 +87,7 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
   if (!isOpen) return null;
 
   const handleFileChange = async (e) => {
+    // ... (保持不变)
     const file = e.target.files[0];
     if (file) {
       try {
@@ -99,7 +115,7 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
 
       const friendData = {
         name,
-        nickname, // 保存昵称
+        nickname,
         photo, 
         tag: tag || null,
         birthday: birthdayData,
@@ -108,16 +124,14 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
         maintenanceInterval: isMaintenanceOn ? parseInt(maintenanceInterval) : null,
         likes,
         dislikes,
+        color: selectedColor, // 保存选中的颜色
       };
 
       if (initialData) {
         await db.friends.update(initialData.id, friendData);
       } else {
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
         await db.friends.add({
           ...friendData,
-          avatar: "😊", 
-          color: randomColor,
           createdAt: new Date(),
         });
       }
@@ -128,13 +142,14 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
   };
 
   const handleDelete = async () => {
+    // ... (保持不变)
     if (!initialData) return;
     if (confirm(`确定要删除好友“${initialData.name}”吗？`)) {
       try {
         await db.transaction('rw', db.friends, db.interactions, db.memos, async () => {
           await db.friends.delete(initialData.id);
           await db.interactions.where('friendId').equals(initialData.id).delete();
-          await db.memos.where('friendId').equals(initialData.id).delete(); // 同时删除Memo
+          await db.memos.where('friendId').equals(initialData.id).delete();
         });
         onClose();
         navigate('/', { replace: true });
@@ -152,6 +167,7 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
       <div className="relative w-full max-w-sm bg-white/95 dark:bg-ios-card-dark/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl border border-white/20 dark:border-white/10 p-6 animate-in zoom-in-95 duration-200 h-auto max-h-[85vh] overflow-y-auto no-scrollbar">
         
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
             <span className="p-2 bg-blue-100 dark:bg-blue-500/20 rounded-full text-blue-600 dark:text-blue-300">
@@ -169,6 +185,7 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
         <form onSubmit={handleSubmit} className="space-y-6">
           
           <div className="flex gap-4">
+             {/* ... Photo Input (保持不变) ... */}
             <div className="flex-shrink-0 relative">
                <span className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Photo</span>
                <label className="block w-20 h-20 rounded-2xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-blue-400 transition-all bg-gray-50 dark:bg-white/5 relative group cursor-pointer">
@@ -202,6 +219,63 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
             </div>
           </div>
 
+          {/* === 颜色选择器 === */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 ml-1 mb-2 flex items-center gap-1 uppercase tracking-wider"><Palette size={12} /> Card Color</label>
+            <div className="flex flex-wrap gap-2">
+              {/* 预设颜色圆点 */}
+              {PRESET_COLORS.map(c => {
+                 const bgClass = THEME_COLORS[c].paper.replace('bg-', 'bg-'); // 简单提取
+                 // 为了显示准确的预览色，这里我们利用 Tailwind 类名其实很难直接拿到Hex。
+                 // 但我们可以直接硬编码预览颜色，或者渲染一个小 div
+                 // 更简单的：直接渲染该颜色的 div
+                 return (
+                   <button
+                     key={c}
+                     type="button"
+                     onClick={() => { setSelectedColor(c); setShowColorPicker(false); }}
+                     className={cn(
+                       "w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center",
+                       THEME_COLORS[c].paper, // 使用预设背景色
+                       selectedColor === c ? "border-blue-500 scale-110" : "border-transparent hover:scale-105"
+                     )}
+                   >
+                     {selectedColor === c && <Check size={14} className="text-gray-600/50" />}
+                   </button>
+                 )
+              })}
+              
+              {/* 自定义颜色按钮 */}
+              <div className="relative">
+                <button
+                   type="button"
+                   onClick={() => setShowColorPicker(!showColorPicker)}
+                   className={cn(
+                     "w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center bg-white dark:bg-white/10",
+                     !PRESET_COLORS.includes(selectedColor) ? "border-blue-500 scale-110" : "border-gray-200 dark:border-white/20 hover:scale-105"
+                   )}
+                   // 如果选中了非预设色，显示那个颜色作为背景
+                   style={!PRESET_COLORS.includes(selectedColor) ? { backgroundColor: selectedColor } : {}}
+                >
+                  {!PRESET_COLORS.includes(selectedColor) ? <Check size={14} className="mix-blend-difference text-white" /> : <Sparkles size={14} className="text-gray-400"/>}
+                </button>
+                
+                {/* 弹出的原生取色器 (定位在按钮旁) */}
+                {showColorPicker && (
+                  <div className="absolute top-10 left-0 z-50 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-white/10 animate-in fade-in zoom-in-95">
+                    <input 
+                      type="color" 
+                      value={PRESET_COLORS.includes(selectedColor) ? "#ffffff" : selectedColor}
+                      onChange={(e) => setSelectedColor(e.target.value)}
+                      className="w-10 h-10 cursor-pointer rounded overflow-hidden"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ... Birthday (保持不变) ... */}
           <div>
             <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 flex items-center gap-1 uppercase tracking-wider"><Calendar size={12} /> Birthday <span className="text-[10px] font-normal opacity-50 lowercase">(Optional)</span></label>
             <div className="flex gap-3">
@@ -211,6 +285,7 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
             </div>
           </div>
 
+          {/* ... Likes/Dislikes (保持不变) ... */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-rose-400 ml-1 mb-1.5 flex items-center gap-1 uppercase tracking-wider"><Heart size={12} fill="currentColor" /> Likes</label>
@@ -222,11 +297,13 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
             </div>
           </div>
 
+          {/* ... Met Date (保持不变) ... */}
           <div>
             <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 flex items-center gap-1 uppercase tracking-wider"><Sparkles size={12} /> Met Date <span className="text-[10px] font-normal opacity-50 lowercase">(Optional)</span></label>
             <div className="relative"><input type="date" value={metAt} onChange={e => setMetAt(e.target.value)} className={cn(inputClass, "w-full appearance-none")} /></div>
           </div>
 
+          {/* ... Maintenance (保持不变) ... */}
           <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-4 border border-gray-100 dark:border-white/5">
             <div className="flex justify-between items-center">
               <label className="flex items-center gap-2 text-sm font-bold text-gray-600 dark:text-gray-300">
@@ -248,11 +325,13 @@ export default function AddFriendModal({ isOpen, onClose, initialData = null }) 
             )}
           </div>
 
+          {/* ... Tag (保持不变) ... */}
           <div>
             <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 flex items-center gap-1 uppercase tracking-wider"><Tag size={12} /> Tag</label>
             <input type="text" value={tag} onChange={e => setTag(e.target.value)} placeholder="例如：高中同学" className={inputClass} />
           </div>
 
+          {/* ... Buttons (保持不变) ... */}
           <button type="submit" className="w-full py-4 mt-4 bg-black dark:bg-white hover:scale-[1.02] active:scale-95 text-white dark:text-black font-bold text-lg rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center gap-2">
             <Check size={20} strokeWidth={3} />
             <span>{initialData ? "保存修改" : "确认添加"}</span>

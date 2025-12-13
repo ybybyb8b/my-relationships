@@ -1,3 +1,4 @@
+// src/lib/utils.js
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -7,6 +8,7 @@ export function cn(...inputs) {
 }
 
 // 2. 全局颜色配置 (莫兰迪拍立得风格)
+// 注意：保持原有的结构不变，供预设使用
 export const THEME_COLORS = {
   blue:   { paper: "bg-[#D5E1E6]", photo: "bg-[#BCCCD3]", text: "text-[#586E75]" },
   pink:   { paper: "bg-[#EEDADD]", photo: "bg-[#DBC2C6]", text: "text-[#8C5E65]" },
@@ -22,7 +24,38 @@ export const THEME_COLORS = {
   default: { paper: "bg-[#F3F4F6]", photo: "bg-[#E5E7EB]", text: "text-[#374151]" }
 };
 
-// 3. 图片压缩处理工具
+// === 新增：获取主题样式的智能函数 ===
+// 如果 colorKey 是预设名（如 'blue'），返回 Tailwind 类名
+// 如果 colorKey 是 Hex 颜色（如 '#ff0000'），返回 style 对象
+export function getThemeStyles(colorKey) {
+  // 1. 检查是否是预设
+  if (THEME_COLORS[colorKey]) {
+    return {
+      type: 'preset',
+      paperClass: THEME_COLORS[colorKey].paper,
+      photoClass: THEME_COLORS[colorKey].photo,
+      textClass: THEME_COLORS[colorKey].text,
+      paperStyle: {},
+      photoStyle: {},
+      textStyle: {}
+    };
+  }
+
+  // 2. 假设是自定义 Hex 颜色
+  // 简单处理：相纸用选定色，照片底色用半透明黑叠加，文字用深灰
+  return {
+    type: 'custom',
+    paperClass: '', 
+    photoClass: '',
+    textClass: 'text-gray-800', // 自定义颜色下，文字默认为深灰，防止对比度不够
+    
+    paperStyle: { backgroundColor: colorKey || '#F3F4F6' },
+    photoStyle: { backgroundColor: 'rgba(0,0,0,0.1)' }, // 通用的照片底色
+    textStyle: {}
+  };
+}
+
+// 3. 图片压缩处理工具 (保持不变)
 export const processImage = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

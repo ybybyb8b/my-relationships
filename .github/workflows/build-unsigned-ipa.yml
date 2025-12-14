@@ -6,82 +6,40 @@ on:
 jobs:
   build-ios:
     runs-on: macos-latest
-
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      # Capacitor 8 需要 Node 22+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: 22
 
       - name: Install Dependencies
-        run: | 
-          npm install
-          npm install @capacitor/ios
+        run: npm install
 
-      # 安装图标生成工具
       - name: Install Asset Generator
         run: npm install @capacitor/assets --save-dev
 
-      - name: Build React App
-        run: |
-          npm run build
-          ls -F dist/ || echo "Warning: dist folder missing!"
-
-      - name: Generate iOS Platform
-        run: |
-          echo "正在清理旧环境..."
-          rm -rf ios
-          
-          echo "正在生成全新 iOS 工程..."
-          npx cap add ios
-          
-          echo "正在同步插件..."
-          npx cap sync ios
-
-      - name: Update CocoaPods
-        run: |
-          gem install cocoapods
-
-      - name: Sync Capacitor
-        run: |
-          npx cap sync ios
-
-      # ✨ 新增步骤：自动生成 iOS 图标
-      # 它会读取根目录下的 assets/icon.png
-      - name: Generate App Icon
-        run: |
-          npx capacitor-assets generate --ios --iconBackgroundColor "#d8d3cd" --splashBackgroundColor "#d8d3cd"
-
-      # 编译 IPA
-# === ⚡️ 核心超级步骤：一气呵成 ⚡️ ===
+      # === ⚡️ 核心构建步骤 (适配 Capacitor 8 SPM 模式) ⚡️ ===
       - name: Build, Sync and Compile IPA
         run: |
-          set -e  # 任何一步出错立刻停止，不许假装成功
+          set -e
 
           echo "🚀 Step 1: Building Web Assets..."
           npm run build
-          # 检查 dist 是否真的生成了
           if [ ! -d "dist" ]; then
-            echo "❌ Error: 'dist' folder missing after build!"
+            echo "❌ Error: 'dist' folder missing!"
             exit 1
           fi
 
           echo "🧹 Step 2: Cleaning old iOS platform..."
           rm -rf ios
 
-          echo "✨ Step 3: Adding iOS platform..."
+          echo "✨ Step 3: Adding iOS platform (SPM Mode)..."
           npx cap add ios
-          # 检查 Podfile 是否真的生成了（这是之前报错的根源）
-          if [ ! -f "ios/App/Podfile" ]; then
-            echo "❌ Error: Podfile was NOT created in ios/App/!"
-            echo "🔍 Debugging ios directory:"
-            ls -R ios || echo "ios directory not found"
-            exit 1
-          fi
+          # Cap 8 不再生成 Podfile，这里不再检查它
 
           echo "🔄 Step 4: Syncing Plugins..."
           npx cap sync ios
@@ -89,13 +47,13 @@ jobs:
           echo "🎨 Step 5: Generating Icons..."
           npx capacitor-assets generate --ios --iconBackgroundColor "#d8d3cd" --splashBackgroundColor "#d8d3cd"
 
-          echo "📦 Step 6: Installing CocoaPods..."
+          echo "🔨 Step 6: Building Xcode Project..."
+          # ⚠️ 注意：Cap 8 使用 SPM，所以这里用 -project App.xcodeproj 而不是 -workspace
+          # 并且不需要 pod install
+          
           cd ios/App
-          pod install --repo-update
-
-          echo "🔨 Step 7: Building Xcode Project..."
           xcodebuild build \
-            -workspace App.xcworkspace \
+            -project App.xcodeproj \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
@@ -105,10 +63,16 @@ jobs:
             CODE_SIGNING_IDENTITY="" \
             -quiet
 
-          echo "📦 Step 8: Packaging IPA..."
+          echo "📦 Step 7: Packaging IPA..."
           mkdir -p Payload
+          # 路径微调：SPM 构建后的产物路径可能略有不同，通常在这个位置
           mv build/Build/Products/Release-iphoneos/App.app Payload/
           zip -r MyRelations.ipa Payload
           
-          # 验证 IPA 是否生成
           ls -lh MyRelations.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyRelations-Unsigned
+          path: ios/App/MyRelations.ipa

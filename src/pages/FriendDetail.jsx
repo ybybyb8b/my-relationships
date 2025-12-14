@@ -14,7 +14,6 @@ export default function FriendDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  // === 状态管理 ===
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingInteraction, setEditingInteraction] = useState(null);
@@ -22,7 +21,6 @@ export default function FriendDetail() {
   const [newMemo, setNewMemo] = useState("");
   const [isAddingMemo, setIsAddingMemo] = useState(false);
 
-  // === 数据查询 ===
   const friend = useLiveQuery(() => db.friends.get(Number(id)), [id]);
   const interactions = useLiveQuery(
     () => db.interactions.where('friendId').equals(Number(id)).reverse().sortBy('date'),
@@ -35,7 +33,6 @@ export default function FriendDetail() {
 
   const styles = getThemeStyles(friend?.color || 'default');
 
-  // === 核心数据计算 ===
   const balanceData = useMemo(() => {
     if (!interactions) return { val: 0, text: "..." };
     let total = 0;
@@ -50,7 +47,7 @@ export default function FriendDetail() {
     });
     total = Number(total.toFixed(2));
     
-    // === 用户自定义莫兰迪配色 ===
+    // 自定义配色
     const morandiGreen = "text-[#248067] dark:text-[#96c24e]"; 
     const morandiOrange = "text-[#cf4813] dark:text-[#e3b4b8]";
     const morandiGray = "text-[#8E8E93] dark:text-[#98989D]";
@@ -60,7 +57,6 @@ export default function FriendDetail() {
     else return { val: 0, label: "扯平", color: morandiGray };
   }, [interactions]);
 
-  // === 辅助文本函数 ===
   const getLastSeenText = () => {
     if (!interactions || interactions.length === 0) return "无记录";
     const lastMeetup = interactions.find(i => i.type === 'meetup' && i.isMeetup !== false);
@@ -79,7 +75,6 @@ export default function FriendDetail() {
     return `${month}月${day}日`;
   };
   
-  // === 事件处理 ===
   const handleInteractionClick = (item) => {
     setEditingInteraction(item);
     setIsRecordModalOpen(true);
@@ -106,10 +101,8 @@ export default function FriendDetail() {
   return (
     <div className="relative min-h-screen w-full bg-[#FAFAF9] dark:bg-black text-gray-800 dark:text-white pb-32 overflow-hidden transition-colors duration-500">
       
-      {/* 1. 全局噪点纹理 */}
       <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.15] dark:opacity-[0.08] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
 
-      {/* 2. 背景氛围光晕 */}
       <div 
         className={cn(
           "fixed top-[-10%] left-[-10%] w-[120%] h-[50vh] rounded-full blur-[120px] pointer-events-none z-0 transition-opacity duration-500",
@@ -122,7 +115,6 @@ export default function FriendDetail() {
         <div className="fixed top-[-10%] left-[-10%] w-[120%] h-[50vh] rounded-full blur-[120px] bg-gray-200 dark:bg-gray-800 opacity-30 dark:opacity-10 pointer-events-none z-0" />
       )}
 
-      {/* 顶部导航 */}
       <div className="relative z-50 px-6 pt-14 pb-4 flex justify-between items-center">
         <button onClick={() => navigate(-1)} className="p-3 rounded-full bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-sm border border-white/20 hover:scale-105 transition-all active:scale-95 text-gray-700 dark:text-white">
           <ArrowLeft size={20} />
@@ -138,7 +130,7 @@ export default function FriendDetail() {
 
       <div className="relative z-10 px-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* === 人物名片 (Header Card) === */}
+        {/* Header Card */}
         <div 
           className={cn(
             "w-full max-w-sm rounded-[2rem] shadow-xl overflow-hidden relative p-6 text-center transition-all duration-500",
@@ -189,25 +181,20 @@ export default function FriendDetail() {
            </div>
         </div>
 
-        {/* === 核心数据 (Stats Tiles) - 回归白色背景 + 阴影 === */}
+        {/* 核心数据 - 白底 + 阴影 */}
         <div className="w-full max-w-sm grid grid-cols-3 gap-3 mt-6">
-           
-           {/* Birthday: text-[#c5708b] dark:text-[#e3b4b8] */}
-           {/* 背景改为 bg-white (浅色) 并加上 shadow-md 增加立体感 */}
            <div className="bg-white dark:bg-white/5 backdrop-blur-md p-4 rounded-2xl shadow-md border border-gray-50 dark:border-white/5 flex flex-col items-center justify-center gap-1.5 transition-all hover:scale-[1.02]">
              <Calendar size={18} className="text-[#c5708b] dark:text-[#e3b4b8]" />
              <span className="text-[10px] font-bold text-[#A0A09E] dark:text-gray-500 uppercase tracking-widest">Birthday</span>
              <span className="text-sm font-bold text-gray-700 dark:text-[#EAEAEA]">{getBirthdayText()}</span>
            </div>
 
-           {/* Last Seen: text-[#8fb2c9] dark:text-[#baccd9] */}
            <div className="bg-white dark:bg-white/5 backdrop-blur-md p-4 rounded-2xl shadow-md border border-gray-50 dark:border-white/5 flex flex-col items-center justify-center gap-1.5 transition-all hover:scale-[1.02]">
              <Clock size={18} className="text-[#8fb2c9] dark:text-[#baccd9]" />
              <span className="text-[10px] font-bold text-[#A0A09E] dark:text-gray-500 uppercase tracking-widest">Last Seen</span>
              <span className="text-sm font-bold text-gray-700 dark:text-[#EAEAEA]">{getLastSeenText()}</span>
            </div>
 
-           {/* Balance */}
            <div className="bg-white dark:bg-white/5 backdrop-blur-md p-4 rounded-2xl shadow-md border border-gray-50 dark:border-white/5 flex flex-col items-center justify-center gap-1.5 transition-all hover:scale-[1.02]">
              <Scale size={18} className={balanceData.color} />
              <span className="text-[10px] font-bold text-[#A0A09E] dark:text-gray-500 uppercase tracking-widest">Balance</span>
@@ -217,9 +204,8 @@ export default function FriendDetail() {
            </div>
         </div>
 
-        {/* === Tabs === */}
+        {/* Tabs - 背景稍亮 */}
         <div className="w-full max-w-sm mt-8 mb-6 sticky top-[80px] z-30">
-          {/* 背景色调亮：bg-white/50 或 bg-gray-100 */}
           <div className="p-1 bg-gray-100/80 dark:bg-white/5 backdrop-blur-xl rounded-xl flex relative shadow-inner">
             <button 
               onClick={() => setActiveTab('timeline')}
@@ -248,10 +234,10 @@ export default function FriendDetail() {
           </div>
         </div>
 
-        {/* === 内容区域 === */}
+        {/* 内容区域 */}
         <div className="w-full max-w-sm min-h-[300px]">
           
-          {/* A. 时光轴视图 - 恢复正常对齐，保持智能隐藏 */}
+          {/* 时光轴 */}
           {activeTab === 'timeline' && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
                {!interactions || interactions.length === 0 ? (
@@ -263,7 +249,6 @@ export default function FriendDetail() {
                    <p className="text-xs mt-1">点右下角记一笔吧</p>
                  </div>
                ) : (
-                 // 恢复 pl-4 和线的对齐，避免拥挤
                  <div className="relative pl-4 space-y-4 before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-[2px] before:bg-gray-100 dark:before:bg-white/10">
                    {interactions.map(item => {
                      const showMeetup = item.type === 'meetup' && item.isMeetup !== false;
@@ -272,7 +257,6 @@ export default function FriendDetail() {
                      const hasTags = showMeetup || showGift || showPrice;
 
                      return (
-                       // 恢复 pl-8 缩进，对齐更好看
                        <div key={item.id} onClick={() => handleInteractionClick(item)} className="relative pl-8 group cursor-pointer">
                           <div className={cn(
                             "absolute left-3 top-3.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#121212] shadow-sm z-10 box-content transition-transform group-hover:scale-125",
@@ -281,7 +265,7 @@ export default function FriendDetail() {
                           
                           <div className={cn(
                             "bg-white dark:bg-white/5 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 active:scale-[0.98] transition-all hover:bg-white/80 dark:hover:bg-white/10 hover:shadow-md",
-                            "p-3.5" // 稍微增加一点内边距，不那么局促
+                            "p-3.5"
                           )}>
                              <div className="flex justify-between items-start">
                                <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm">{item.title}</h4>
@@ -327,7 +311,7 @@ export default function FriendDetail() {
             </div>
           )}
 
-          {/* B. 印象墙视图 */}
+          {/* 印象墙 */}
           {activeTab === 'memos' && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300 space-y-6">
               
@@ -354,7 +338,6 @@ export default function FriendDetail() {
                 </div>
               )}
 
-              {/* Memos 输入 */}
               {isAddingMemo ? (
                 <form onSubmit={handleAddMemo} className="flex gap-2 animate-in fade-in slide-in-from-top-1">
                   <input 
@@ -407,9 +390,11 @@ export default function FriendDetail() {
         </div>
       </div>
 
+      {/* === 悬浮球 (FAB) === */}
       <button 
         onClick={() => setIsRecordModalOpen(true)}
-        className="fixed bottom-8 right-6 w-14 h-14 bg-black dark:bg-white text-white dark:text-black rounded-full shadow-2xl shadow-blue-900/20 dark:shadow-none flex items-center justify-center z-[60] hover:scale-110 active:scale-90 transition-all duration-300"
+        // 修改了 bottom-28 (112px)，即使在大屏手机上也不会被 dock 栏挡住
+        className="fixed right-6 bottom-28 w-14 h-14 bg-black dark:bg-white text-white dark:text-black rounded-full shadow-2xl shadow-blue-900/20 dark:shadow-none flex items-center justify-center z-[60] hover:scale-110 active:scale-90 transition-all duration-300"
       >
         <Plus size={28} strokeWidth={2.5} />
       </button>

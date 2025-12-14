@@ -25,6 +25,8 @@
   body {
     /* 强制指定背景色为 #fafaf9 (浅色) 和 black (深色) */
     @apply bg-[#fafaf9] text-[#1c1c1e] antialiased;
+
+    overscroll-behavior-y: none;
   }
 
   /* 深色模式适配 */

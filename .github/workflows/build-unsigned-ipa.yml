@@ -5,19 +5,22 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: | 
+          npm install
+          npm install @capacitor/ios
 
       # 安装图标生成工具
       - name: Install Asset Generator
@@ -27,6 +30,26 @@ jobs:
         run: |
           npm run build
           ls -F dist/ || echo "Warning: dist folder missing!"
+
+      - name: Generate iOS Platform
+        run: |
+          echo "正在清理旧环境..."
+          rm -rf ios
+          
+          echo "正在生成全新 iOS 工程..."
+          npx cap add ios
+          
+          echo "正在同步插件..."
+          npx cap sync ios
+
+      - name: Check Podfile
+        run: |
+          if [ -f "ios/Podfile" ]; then
+            echo "✅ 成功：Podfile 已生成！"
+          else
+            echo "❌ 失败：仍然没有找到 Podfile"
+            exit 1
+          fi
 
       - name: Update CocoaPods
         run: |

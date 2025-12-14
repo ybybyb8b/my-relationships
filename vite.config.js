@@ -10,12 +10,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Deep Relations', // 安装后桌面上显示的名字
+        name: 'MyRelations', 
         short_name: 'Relationships',
         description: '极简人际关系管理',
         theme_color: '#ffffff',
         background_color: '#ffffff',
-        display: 'standalone', // <--- 关键：这会让它像原生 App 一样全屏，没有地址栏
+        display: 'standalone', 
         icons: [
           {
             src: 'pwa-192x192.png',
@@ -31,4 +31,10 @@ export default defineConfig({
       }
     })
   ],
+  // === 核心修改 ===
+  build: {
+    // 不要用 rollupOptions 了，直接把警告阈值调大
+    // 1000 KB = 1MB，足够消除警告了
+    chunkSizeWarningLimit: 1000, 
+  }
 })

@@ -21,12 +21,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ... 下面是你原来的代码 ... */
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 @layer base {
   body {
     /* 强制指定背景色为 #fafaf9 (浅色) 和 black (深色) */

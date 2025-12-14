@@ -32,10 +32,8 @@ jobs:
         run: |
           gem install cocoapods
 
-      # 初始化 iOS 环境
-      - name: Add & Sync iOS Platform
+      - name: Sync Capacitor
         run: |
-          npx cap add ios
           npx cap sync ios
 
       # ✨ 新增步骤：自动生成 iOS 图标
@@ -47,7 +45,7 @@ jobs:
       # 编译 IPA
       - name: Build Unsigned IPA
         run: |
-          cd ios/App
+          cd ios
           pod install
           
           xcodebuild build \

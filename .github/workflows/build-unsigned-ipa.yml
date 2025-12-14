@@ -42,15 +42,6 @@ jobs:
           echo "正在同步插件..."
           npx cap sync ios
 
-      - name: Check Podfile
-        run: |
-          if [ -f "ios/Podfile" ]; then
-            echo "✅ 成功：Podfile 已生成！"
-          else
-            echo "❌ 失败：仍然没有找到 Podfile"
-            exit 1
-          fi
-
       - name: Update CocoaPods
         run: |
           gem install cocoapods

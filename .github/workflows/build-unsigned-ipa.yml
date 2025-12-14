@@ -57,11 +57,43 @@ jobs:
           npx capacitor-assets generate --ios --iconBackgroundColor "#d8d3cd" --splashBackgroundColor "#d8d3cd"
 
       # 编译 IPA
-      - name: Build Unsigned IPA
+# === ⚡️ 核心超级步骤：一气呵成 ⚡️ ===
+      - name: Build, Sync and Compile IPA
         run: |
-          cd ios
-          pod install
-          
+          set -e  # 任何一步出错立刻停止，不许假装成功
+
+          echo "🚀 Step 1: Building Web Assets..."
+          npm run build
+          # 检查 dist 是否真的生成了
+          if [ ! -d "dist" ]; then
+            echo "❌ Error: 'dist' folder missing after build!"
+            exit 1
+          fi
+
+          echo "🧹 Step 2: Cleaning old iOS platform..."
+          rm -rf ios
+
+          echo "✨ Step 3: Adding iOS platform..."
+          npx cap add ios
+          # 检查 Podfile 是否真的生成了（这是之前报错的根源）
+          if [ ! -f "ios/App/Podfile" ]; then
+            echo "❌ Error: Podfile was NOT created in ios/App/!"
+            echo "🔍 Debugging ios directory:"
+            ls -R ios || echo "ios directory not found"
+            exit 1
+          fi
+
+          echo "🔄 Step 4: Syncing Plugins..."
+          npx cap sync ios
+
+          echo "🎨 Step 5: Generating Icons..."
+          npx capacitor-assets generate --ios --iconBackgroundColor "#d8d3cd" --splashBackgroundColor "#d8d3cd"
+
+          echo "📦 Step 6: Installing CocoaPods..."
+          cd ios/App
+          pod install --repo-update
+
+          echo "🔨 Step 7: Building Xcode Project..."
           xcodebuild build \
             -workspace App.xcworkspace \
             -scheme App \
@@ -73,12 +105,10 @@ jobs:
             CODE_SIGNING_IDENTITY="" \
             -quiet
 
+          echo "📦 Step 8: Packaging IPA..."
           mkdir -p Payload
           mv build/Build/Products/Release-iphoneos/App.app Payload/
           zip -r MyRelations.ipa Payload
-
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: RMyRelations-Unsigned
-          path: ios/App/MyRelations.ipa
+          
+          # 验证 IPA 是否生成
+          ls -lh MyRelations.ipa

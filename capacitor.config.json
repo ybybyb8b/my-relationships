@@ -1,5 +1,11 @@
 {
   "appId": "com.eva.relations",
   "appName": "DeepRelations",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "allowsBackForwardNavigationGestures": true
+  }
 }

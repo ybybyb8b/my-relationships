@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { X, Check, Calendar, Gift, ArrowUpRight, ArrowDownLeft, MapPin, Trash2, Search } from "lucide-react";
+import { X, Check, Calendar, Gift, ArrowUpRight, ArrowDownLeft, MapPin, Trash2, Search, DollarSign } from "lucide-react";
 import { db } from "../db";
 import { cn } from "../lib/utils";
 
@@ -13,16 +13,16 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
   const [splitType, setSplitType] = useState("me"); 
   const [isMeetup, setIsMeetup] = useState(true);
 
-  // === 多选逻辑优化 ===
+  // === 多选逻辑优化 (保留你原来的逻辑) ===
   const allFriends = useLiveQuery(() => db.friends.orderBy('name').toArray());
   const [selectedFriendIds, setSelectedFriendIds] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(""); // 搜索词
+  const [searchTerm, setSearchTerm] = useState(""); 
 
   // 数据初始化
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        // 编辑模式：锁定单一朋友，不支持修改参与人
+        // 编辑模式
         setType(initialData.type || "meetup");
         setTitle(initialData.title || "");
         if (initialData.date) {
@@ -41,7 +41,7 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
         setSplitType("me"); 
         setIsMeetup(true);
         setDate(new Date().toISOString().split('T')[0]); 
-        setSearchTerm(""); // 重置搜索
+        setSearchTerm(""); 
         
         if (friendId) {
           setSelectedFriendIds([Number(friendId)]);
@@ -56,17 +56,16 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
 
   // 切换选中
   const toggleFriend = (id) => {
-    if (initialData || (friendId && id === Number(friendId))) return; // 锁定的不能动
+    if (initialData || (friendId && id === Number(friendId))) return; 
 
     if (selectedFriendIds.includes(id)) {
       setSelectedFriendIds(selectedFriendIds.filter(fid => fid !== id));
     } else {
       setSelectedFriendIds([...selectedFriendIds, id]);
-      setSearchTerm(""); // 选中后清空搜索，方便选下一个人
+      setSearchTerm(""); 
     }
   };
 
-  // 过滤朋友列表
   const filteredFriends = allFriends?.filter(f => 
     f.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (f.nickname && f.nickname.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -74,7 +73,9 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    // 允许标题为空，如果为空自动填充默认值
+    const finalTitle = title.trim() || (type === 'meetup' ? '碰个面' : '礼物');
+
     if (selectedFriendIds.length === 0) {
       alert("请至少选择一位朋友");
       return;
@@ -83,9 +84,9 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
     try {
       const baseData = {
         type, 
-        title,
+        title: finalTitle,
         date: new Date(date),
-        price: price ? Number(price) : null,
+        price: price ? Number(price) : 0, // 确保是数字
         giftDirection: type === 'gift' ? giftDirection : null, 
         splitType: type === 'meetup' ? splitType : null,
         isMeetup: type === 'meetup' ? isMeetup : false,
@@ -124,27 +125,33 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:px-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
+      {/* 遮罩层 */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
       
-      <div className="relative w-full max-w-sm bg-white/95 dark:bg-ios-card-dark/95 backdrop-blur-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 p-6 animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] overflow-y-auto no-scrollbar">
+      {/* 修改点 1: max-w-sm -> max-w-md 
+        让弹窗宽一点，给并排的输入框更多空间 
+      */}
+      <div className="relative w-full max-w-md bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-2xl rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl border border-white/20 dark:border-white/10 p-6 animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] overflow-y-auto no-scrollbar">
         
+        {/* 顶部把手 (移动端视觉优化) */}
+        <div className="w-10 h-1 bg-gray-200 dark:bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
+
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-xl font-bold text-ios-text dark:text-white">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               {initialData ? "编辑记录" : "记一笔"}
             </h2>
           </div>
           <button onClick={onClose} className="p-2 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors">
-            <X size={18} className="text-gray-500 dark:text-white/70" />
+            <X size={20} className="text-gray-500 dark:text-white/70" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* === 0. 优化的多选器 (Search & Tags) === */}
+          {/* === 多选器 (Search & Tags) === */}
           {!initialData && (
             <div className="space-y-3">
-              {/* 已选中的标签区域 */}
               {selectedFriendIds.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {selectedFriendIds.map(id => {
@@ -153,7 +160,6 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                     return (
                       <div key={id} className="flex items-center gap-1 pl-2 pr-1 py-1 bg-black text-white dark:bg-white dark:text-black rounded-full text-xs font-bold animate-in zoom-in-50 duration-200">
                         <span>{f.name}</span>
-                        {/* 如果是当前页面的主角(friendId)，不允许删除 */}
                         {!(friendId && Number(friendId) === id) && (
                           <button type="button" onClick={() => toggleFriend(id)} className="p-0.5 hover:bg-white/20 rounded-full">
                             <X size={12} />
@@ -165,7 +171,6 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                 </div>
               )}
 
-              {/* 搜索框 */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
@@ -173,49 +178,40 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder={selectedFriendIds.length === 0 ? "搜索并添加参与人..." : "继续添加..."}
-                  className="w-full h-10 bg-gray-50 dark:bg-white/5 rounded-xl pl-9 pr-4 text-sm outline-none border border-transparent focus:border-blue-500/30 transition-all"
+                  className="w-full h-10 bg-gray-50 dark:bg-white/5 rounded-xl pl-9 pr-4 text-sm outline-none border border-transparent focus:border-blue-500/30 transition-all placeholder:text-gray-400 dark:text-white"
                 />
               </div>
 
-              {/* 搜索结果列表 (限制高度，避免臃肿) */}
-              <div className="max-h-32 overflow-y-auto border border-gray-100 dark:border-white/5 rounded-xl divide-y divide-gray-50 dark:divide-white/5">
-                {filteredFriends?.map(f => {
-                  // 如果已经选中了，就不显示在列表里，保持列表干净
-                  if (selectedFriendIds.includes(f.id)) return null;
-                  
-                  return (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => toggleFriend(f.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/10 text-left transition-colors"
-                    >
-                      {/* 小头像 */}
-                      <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center text-xs overflow-hidden">
-                        {f.photo ? <img src={f.photo} className="w-full h-full object-cover"/> : f.name[0]}
-                      </div>
-                      <span className="text-sm text-gray-700 dark:text-gray-200">{f.name}</span>
-                    </button>
-                  );
-                })}
-                {/* 空状态 */}
-                {filteredFriends?.length === 0 && (
-                  <div className="p-3 text-center text-xs text-gray-400">没有找到这位朋友</div>
-                )}
-                {/* 初始状态提示 */}
-                {searchTerm === "" && filteredFriends?.length > 0 && selectedFriendIds.length === 0 && (
-                  <div className="p-2 text-center text-[10px] text-gray-300 bg-gray-50/50">
-                    输入名字查找，或直接点击上方列表
-                  </div>
-                )}
-              </div>
+              {searchTerm && (
+                <div className="max-h-32 overflow-y-auto border border-gray-100 dark:border-white/5 rounded-xl divide-y divide-gray-50 dark:divide-white/5 bg-white dark:bg-[#2C2C2E]">
+                  {filteredFriends?.map(f => {
+                    if (selectedFriendIds.includes(f.id)) return null;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => toggleFriend(f.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/10 text-left transition-colors"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center text-xs overflow-hidden text-gray-500 dark:text-white">
+                          {f.photo ? <img src={f.photo} className="w-full h-full object-cover"/> : f.name[0]}
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-200">{f.name}</span>
+                      </button>
+                    );
+                  })}
+                  {filteredFriends?.length === 0 && (
+                    <div className="p-3 text-center text-xs text-gray-400">没有找到这位朋友</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* ... 类型切换等保持不变 ... */}
-          <div className="flex p-1 bg-gray-100 dark:bg-white/5 rounded-xl">
-            <button type="button" onClick={() => setType("meetup")} className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all", type === "meetup" ? "bg-white dark:bg-white/10 shadow-sm text-blue-600 dark:text-sky-300" : "text-gray-400 hover:text-gray-500 dark:text-white/30")}><Calendar size={16} /> 见面/活动</button>
-            <button type="button" onClick={() => setType("gift")} className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all", type === "gift" ? "bg-white dark:bg-white/10 shadow-sm text-rose-500 dark:text-rose-300" : "text-gray-400 hover:text-gray-500 dark:text-white/30")}><Gift size={16} /> 礼物往来</button>
+          {/* 类型切换 */}
+          <div className="flex p-1 bg-gray-100 dark:bg-black/40 rounded-xl">
+            <button type="button" onClick={() => setType("meetup")} className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all", type === "meetup" ? "bg-white dark:bg-[#2C2C2E] shadow-sm text-blue-600 dark:text-sky-400" : "text-gray-400 hover:text-gray-500 dark:text-white/30")}><Calendar size={16} /> 见面/活动</button>
+            <button type="button" onClick={() => setType("gift")} className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all", type === "gift" ? "bg-white dark:bg-[#2C2C2E] shadow-sm text-rose-500 dark:text-rose-400" : "text-gray-400 hover:text-gray-500 dark:text-white/30")}><Gift size={16} /> 礼物往来</button>
           </div>
 
           {type === 'gift' && (
@@ -233,31 +229,44 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                 <button type="button" onClick={() => setSplitType("they")} className={cn("flex-1 py-3 rounded-xl border text-xs sm:text-sm font-medium transition-all", splitType === "they" ? "border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-200" : "border-transparent bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/40")}>Ta请客</button>
               </div>
 
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl cursor-pointer" onClick={() => setIsMeetup(!isMeetup)}>
+              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl cursor-pointer active:scale-98 transition-transform" onClick={() => setIsMeetup(!isMeetup)}>
                 <div className="flex items-center gap-2">
                   <MapPin size={16} className={isMeetup ? "text-blue-500" : "text-gray-400"} />
-                  <span className="text-sm font-medium text-ios-text dark:text-white">确实见面了</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-white">确实见面了</span>
                 </div>
-                <div className={cn("w-10 h-6 rounded-full p-1 transition-colors", isMeetup ? "bg-blue-500" : "bg-gray-300 dark:bg-white/20")}>
-                  <div className={cn("w-4 h-4 bg-white rounded-full shadow-sm transition-transform", isMeetup ? "translate-x-4" : "translate-x-0")} />
+                <div className={cn("w-10 h-6 rounded-full p-1 transition-colors duration-200", isMeetup ? "bg-blue-500" : "bg-gray-300 dark:bg-white/20")}>
+                  <div className={cn("w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200", isMeetup ? "translate-x-4" : "translate-x-0")} />
                 </div>
               </div>
             </div>
           )}
 
           <div>
-            <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">{type === 'gift' ? 'Gift Name' : 'Activity Name'}</label>
+            <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">{type === 'gift' ? '礼物名称' : '活动名称'}</label>
             <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'gift' ? "例如：乐高积木" : "例如：吃火锅"} className={inputClass} />
           </div>
 
-          <div className="flex gap-4">
-             <div className="flex-1">
+          {/* 修改点 2: 布局修复 
+             原来是 flex gap-4，现在改为 grid grid-cols-2 gap-4
+             强制让两个输入框各占一半宽度，不再因为日期组件过宽而挤压
+          */}
+          <div className="grid grid-cols-2 gap-4">
+             <div className="min-w-0">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Date</label>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
              </div>
-             <div className="flex-1">
+             <div className="min-w-0 relative">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Price</label>
-                <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" className={inputClass} />
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={price} 
+                    onChange={e => setPrice(e.target.value)} 
+                    placeholder="0.00" 
+                    className={cn(inputClass, "pl-8")} // 给 ¥ 符号留位置
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">¥</span>
+                </div>
              </div>
           </div>
 

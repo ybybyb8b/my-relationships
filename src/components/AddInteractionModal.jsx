@@ -253,7 +253,7 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
              <div className="min-w-0">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Date</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cn(inputClass, "px-2 text-center sm:text-left")} style={{ WebkitAppearance: 'none' }}/>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cn(inputClass, "px-2 py-0 leading-[3rem] tracking-wide text-center sm:text-left")} style={{ WebkitAppearance: 'none' }}/>
              </div>
              <div className="min-w-0 relative">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Price</label>

@@ -34,20 +34,13 @@ jobs:
             exit 1
           fi
 
-          echo "🧹 Step 2: Cleaning old iOS platform..."
-          rm -rf ios
-
-          echo "✨ Step 3: Adding iOS platform (SPM Mode)..."
-          npx cap add ios
-          # Cap 8 不再生成 Podfile，这里不再检查它
-
-          echo "🔄 Step 4: Syncing Plugins..."
+          echo "🔄 Step 24: Syncing Plugins..."
           npx cap sync ios
 
-          echo "🎨 Step 5: Generating Icons..."
+          echo "🎨 Step 3: Generating Icons..."
           npx capacitor-assets generate --ios --iconBackgroundColor "#d8d3cd" --splashBackgroundColor "#d8d3cd"
 
-          echo "🔨 Step 6: Building Xcode Project..."
+          echo "🔨 Step 4: Building Xcode Project..."
           # ⚠️ 注意：Cap 8 使用 SPM，所以这里用 -project App.xcodeproj 而不是 -workspace
           # 并且不需要 pod install
           
@@ -63,7 +56,7 @@ jobs:
             CODE_SIGNING_IDENTITY="" \
             -quiet
 
-          echo "📦 Step 7: Packaging IPA..."
+          echo "📦 Step 5: Packaging IPA..."
           mkdir -p Payload
           # 路径微调：SPM 构建后的产物路径可能略有不同，通常在这个位置
           mv build/Build/Products/Release-iphoneos/App.app Payload/

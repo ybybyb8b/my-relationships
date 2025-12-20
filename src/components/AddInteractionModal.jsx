@@ -121,7 +121,7 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
     }
   };
 
-  const inputClass = "w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-black/50 rounded-xl px-4 h-12 transition-all outline-none text-base text-ios-text dark:text-white placeholder:text-gray-400";
+  const inputClass = "w-full appearance-none block bg-gray-50 dark:bg-white/5 border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-black/50 rounded-xl px-4 h-12 transition-all outline-none text-base text-ios-text dark:text-white placeholder:text-gray-400";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:px-4">
@@ -250,10 +250,10 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
              原来是 flex gap-4，现在改为 grid grid-cols-2 gap-4
              强制让两个输入框各占一半宽度，不再因为日期组件过宽而挤压
           */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
              <div className="min-w-0">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Date</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputClass} />
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cn(inputClass, "px-2 text-center sm:text-left")} style={{ WebkitAppearance: 'none' }}/>
              </div>
              <div className="min-w-0 relative">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Price</label>
@@ -263,9 +263,9 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                     value={price} 
                     onChange={e => setPrice(e.target.value)} 
                     placeholder="0.00" 
-                    className={cn(inputClass, "pl-8")} // 给 ¥ 符号留位置
+                    className={cn(inputClass, "pl-8 appearance-none")}
                   />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">¥</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold pointer-events-none">¥</span>
                 </div>
              </div>
           </div>

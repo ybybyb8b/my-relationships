@@ -25,7 +25,7 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
   useEffect(() => {
     if (subItems.length > 0) {
       const total = subItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-      setPrice(total > 0 ? total : "");
+      setPrice(total > 0 ? Number(total.toFixed(2)) : "");
     }
   }, [subItems]);
 

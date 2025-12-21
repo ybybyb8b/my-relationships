@@ -304,18 +304,18 @@ export default function Home() {
               {/* 卡片右上角的状态胶囊 (深色优化) */}
               {friend.daysDiff >= 0 && (
                 <div className={cn(
-                  "absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm backdrop-blur-md border flex items-center gap-1 z-10 transition-all",
-                  // 这里的状态颜色也需要变柔和
+                  "absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-md backdrop-blur-md border flex items-center gap-1.5 z-10 transition-all",
+
                   friend.status === 'overdue' 
-                    ? "bg-red-100/90 dark:bg-red-500/20 text-red-600 dark:text-red-300 border-red-200 dark:border-red-500/10" 
+                    ? "bg-red-50/95 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/10" 
                     : friend.status === 'safe'
-                      ? "bg-green-100/90 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/10" 
-                      : "bg-white/80 dark:bg-white/20 text-gray-500 dark:text-gray-300 border-white/40 dark:border-white/10" 
+                      ? "bg-green-50/95 dark:bg-green-500/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-500/10" 
+                      : "bg-gray-100/95 dark:bg-zinc-800/80 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-white/20" 
                 )}>
                   <div className={cn(
-                    "w-1.5 h-1.5 rounded-full",
+                    "w-1.5 h-1.5 rounded-full ring-1 ring-black/5 dark:ring-white/10",
                     friend.status === 'overdue' ? "bg-red-500 animate-pulse" : 
-                    friend.status === 'safe' ? "bg-green-500" : "bg-gray-400"
+                    friend.status === 'safe' ? "bg-green-500" : "bg-gray-500"
                   )} />
                   {friend.daysDiff === 0 ? "今天" : `${friend.daysDiff}天`}
                 </div>

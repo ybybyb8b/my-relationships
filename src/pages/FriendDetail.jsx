@@ -237,7 +237,7 @@ export default function FriendDetail() {
         {/* 内容区域 */}
         <div className="w-full max-w-sm min-h-[300px]">
           
-          {/* 时光轴 */}
+          {/* 时光轴 (Updated with SubItems logic) */}
           {activeTab === 'timeline' && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
                {!interactions || interactions.length === 0 ? (
@@ -267,13 +267,27 @@ export default function FriendDetail() {
                             "bg-white dark:bg-white/5 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 dark:border-white/5 active:scale-[0.98] transition-all hover:bg-white/80 dark:hover:bg-white/10 hover:shadow-md",
                             "p-3.5"
                           )}>
+                             {/* 1. 标题和日期 */}
                              <div className="flex justify-between items-start">
                                <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm">{item.title}</h4>
                                <span className="text-[10px] font-medium text-gray-400 font-mono tracking-tight pt-0.5">
                                  {item.date.toLocaleDateString()}
                                </span>
                              </div>
+
+                             {/* 2. 明细列表 (新增) */}
+                             {item.subItems && item.subItems.length > 0 && (
+                                <div className="mt-2 mb-1 pl-2 border-l-2 border-gray-100 dark:border-white/10 space-y-1">
+                                  {item.subItems.map((sub, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                                      <span>{sub.title}</span>
+                                      <span className="font-mono opacity-80">¥{sub.price}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                             )}
                              
+                             {/* 3. 底部标签 */}
                              {hasTags && (
                                <div className="flex items-center gap-2 mt-2">
                                   {showMeetup && (
@@ -311,7 +325,7 @@ export default function FriendDetail() {
             </div>
           )}
 
-          {/* 印象墙 */}
+          {/* 印象墙 (保持不变) */}
           {activeTab === 'memos' && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300 space-y-6">
               
@@ -393,7 +407,6 @@ export default function FriendDetail() {
       {/* === 悬浮球 (FAB) === */}
       <button 
         onClick={() => setIsRecordModalOpen(true)}
-        // 修改了 bottom-28 (112px)，即使在大屏手机上也不会被 dock 栏挡住
         className="fixed right-6 bottom-28 w-14 h-14 bg-black dark:bg-white text-white dark:text-black rounded-full shadow-2xl shadow-blue-900/20 dark:shadow-none flex items-center justify-center z-[60] hover:scale-110 active:scale-90 transition-all duration-300"
       >
         <Plus size={28} strokeWidth={2.5} />

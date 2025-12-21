@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { X, Check, Calendar, Gift, ArrowUpRight, ArrowDownLeft, MapPin, Trash2, Search, DollarSign } from "lucide-react";
+import { X, Check, Calendar, Gift, ArrowUpRight, ArrowDownLeft, MapPin, Trash2, Search, Plus, MinusCircle } from "lucide-react";
 import { db } from "../db";
 import { cn } from "../lib/utils";
 
@@ -8,62 +8,82 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
   const [type, setType] = useState("meetup"); 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]); 
+  
+  // 核心改动：新增 subItems 状态
+  const [subItems, setSubItems] = useState([]);
   const [price, setPrice] = useState(""); 
+
   const [giftDirection, setGiftDirection] = useState("out"); 
   const [splitType, setSplitType] = useState("me"); 
   const [isMeetup, setIsMeetup] = useState(true);
 
-  // === 多选逻辑优化 (保留你原来的逻辑) ===
   const allFriends = useLiveQuery(() => db.friends.orderBy('name').toArray());
   const [selectedFriendIds, setSelectedFriendIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState(""); 
 
-  // 数据初始化
+  // 当明细变化时，自动计算总价
+  useEffect(() => {
+    if (subItems.length > 0) {
+      const total = subItems.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+      setPrice(total > 0 ? total : "");
+    }
+  }, [subItems]);
+
+  // 初始化
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        // 编辑模式
         setType(initialData.type || "meetup");
         setTitle(initialData.title || "");
         if (initialData.date) {
            try { setDate(new Date(initialData.date).toISOString().split('T')[0]); } catch(e) { setDate(""); }
         }
         setPrice(initialData.price || "");
+        setSubItems(initialData.subItems || []); // 载入明细
         setGiftDirection(initialData.giftDirection || "out");
         setSplitType(initialData.splitType || "me");
         setIsMeetup(initialData.isMeetup !== false); 
         setSelectedFriendIds([initialData.friendId]); 
       } else {
-        // 新增模式
         setTitle("");
         setPrice("");
+        setSubItems([]); 
         setType("meetup");
         setSplitType("me"); 
         setIsMeetup(true);
         setDate(new Date().toISOString().split('T')[0]); 
         setSearchTerm(""); 
-        
-        if (friendId) {
-          setSelectedFriendIds([Number(friendId)]);
-        } else {
-          setSelectedFriendIds([]); 
-        }
+        if (friendId) setSelectedFriendIds([Number(friendId)]);
+        else setSelectedFriendIds([]); 
       }
     }
   }, [isOpen, initialData, friendId]);
 
   if (!isOpen) return null;
 
-  // 切换选中
   const toggleFriend = (id) => {
     if (initialData || (friendId && id === Number(friendId))) return; 
-
     if (selectedFriendIds.includes(id)) {
       setSelectedFriendIds(selectedFriendIds.filter(fid => fid !== id));
     } else {
       setSelectedFriendIds([...selectedFriendIds, id]);
       setSearchTerm(""); 
     }
+  };
+
+  // 添加一条明细
+  const addSubItem = () => {
+    setSubItems([...subItems, { id: Date.now(), title: "", price: "" }]);
+  };
+
+  // 更新明细
+  const updateSubItem = (id, field, value) => {
+    setSubItems(subItems.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  // 删除明细
+  const removeSubItem = (id) => {
+    setSubItems(subItems.filter(item => item.id !== id));
   };
 
   const filteredFriends = allFriends?.filter(f => 
@@ -73,7 +93,6 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // 允许标题为空，如果为空自动填充默认值
     const finalTitle = title.trim() || (type === 'meetup' ? '碰个面' : '礼物');
 
     if (selectedFriendIds.length === 0) {
@@ -86,7 +105,8 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
         type, 
         title: finalTitle,
         date: new Date(date),
-        price: price ? Number(price) : 0, // 确保是数字
+        price: price ? Number(price) : 0,
+        subItems: subItems.length > 0 ? subItems : null, // 保存明细
         giftDirection: type === 'gift' ? giftDirection : null, 
         splitType: type === 'meetup' ? splitType : null,
         isMeetup: type === 'meetup' ? isMeetup : false,
@@ -96,13 +116,9 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
       if (initialData) {
         await db.interactions.update(initialData.id, baseData);
       } else {
-        const records = selectedFriendIds.map(fid => ({
-          ...baseData,
-          friendId: fid
-        }));
+        const records = selectedFriendIds.map(fid => ({ ...baseData, friendId: fid }));
         await db.interactions.bulkAdd(records);
       }
-      
       onClose();
     } catch (error) {
       alert("保存失败: " + error);
@@ -125,23 +141,14 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:px-4">
-      {/* 遮罩层 */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
       
-      {/* 修改点 1: max-w-sm -> max-w-md 
-        让弹窗宽一点，给并排的输入框更多空间 
-      */}
       <div className="relative w-full max-w-md bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-2xl rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl border border-white/20 dark:border-white/10 p-6 animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] overflow-y-auto no-scrollbar">
         
-        {/* 顶部把手 (移动端视觉优化) */}
         <div className="w-10 h-1 bg-gray-200 dark:bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
 
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              {initialData ? "编辑记录" : "记一笔"}
-            </h2>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{initialData ? "编辑记录" : "记一笔"}</h2>
           <button onClick={onClose} className="p-2 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 transition-colors">
             <X size={20} className="text-gray-500 dark:text-white/70" />
           </button>
@@ -149,7 +156,7 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* === 多选器 (Search & Tags) === */}
+          {/* 选择朋友部分 (保持不变) */}
           {!initialData && (
             <div className="space-y-3">
               {selectedFriendIds.length > 0 && (
@@ -160,55 +167,34 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                     return (
                       <div key={id} className="flex items-center gap-1 pl-2 pr-1 py-1 bg-black text-white dark:bg-white dark:text-black rounded-full text-xs font-bold animate-in zoom-in-50 duration-200">
                         <span>{f.name}</span>
-                        {!(friendId && Number(friendId) === id) && (
-                          <button type="button" onClick={() => toggleFriend(id)} className="p-0.5 hover:bg-white/20 rounded-full">
-                            <X size={12} />
-                          </button>
-                        )}
+                        {!(friendId && Number(friendId) === id) && <button type="button" onClick={() => toggleFriend(id)} className="p-0.5 hover:bg-white/20 rounded-full"><X size={12} /></button>}
                       </div>
                     );
                   })}
                 </div>
               )}
-
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                  type="text" 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={selectedFriendIds.length === 0 ? "搜索并添加参与人..." : "继续添加..."}
-                  className="w-full h-10 bg-gray-50 dark:bg-white/5 rounded-xl pl-9 pr-4 text-sm outline-none border border-transparent focus:border-blue-500/30 transition-all placeholder:text-gray-400 dark:text-white"
-                />
+                <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={selectedFriendIds.length === 0 ? "搜索并添加参与人..." : "继续添加..."} className="w-full h-10 bg-gray-50 dark:bg-white/5 rounded-xl pl-9 pr-4 text-sm outline-none border border-transparent focus:border-blue-500/30 transition-all placeholder:text-gray-400 dark:text-white" />
               </div>
-
               {searchTerm && (
                 <div className="max-h-32 overflow-y-auto border border-gray-100 dark:border-white/5 rounded-xl divide-y divide-gray-50 dark:divide-white/5 bg-white dark:bg-[#2C2C2E]">
                   {filteredFriends?.map(f => {
                     if (selectedFriendIds.includes(f.id)) return null;
                     return (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => toggleFriend(f.id)}
-                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/10 text-left transition-colors"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center text-xs overflow-hidden text-gray-500 dark:text-white">
-                          {f.photo ? <img src={f.photo} className="w-full h-full object-cover"/> : f.name[0]}
-                        </div>
+                      <button key={f.id} type="button" onClick={() => toggleFriend(f.id)} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/10 text-left transition-colors">
+                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-white/10 flex items-center justify-center text-xs overflow-hidden text-gray-500 dark:text-white">{f.photo ? <img src={f.photo} className="w-full h-full object-cover"/> : f.name[0]}</div>
                         <span className="text-sm text-gray-700 dark:text-gray-200">{f.name}</span>
                       </button>
                     );
                   })}
-                  {filteredFriends?.length === 0 && (
-                    <div className="p-3 text-center text-xs text-gray-400">没有找到这位朋友</div>
-                  )}
+                  {filteredFriends?.length === 0 && <div className="p-3 text-center text-xs text-gray-400">没有找到这位朋友</div>}
                 </div>
               )}
             </div>
           )}
 
-          {/* 类型切换 */}
+          {/* 类型切换 (保持不变) */}
           <div className="flex p-1 bg-gray-100 dark:bg-black/40 rounded-xl">
             <button type="button" onClick={() => setType("meetup")} className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all", type === "meetup" ? "bg-white dark:bg-[#2C2C2E] shadow-sm text-blue-600 dark:text-sky-400" : "text-gray-400 hover:text-gray-500 dark:text-white/30")}><Calendar size={16} /> 见面/活动</button>
             <button type="button" onClick={() => setType("gift")} className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all", type === "gift" ? "bg-white dark:bg-[#2C2C2E] shadow-sm text-rose-500 dark:text-rose-400" : "text-gray-400 hover:text-gray-500 dark:text-white/30")}><Gift size={16} /> 礼物往来</button>
@@ -217,7 +203,7 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
           {type === 'gift' && (
             <div className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                <button type="button" onClick={() => setGiftDirection("out")} className={cn("flex-1 py-3 px-4 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all", giftDirection === "out" ? "border-rose-200 dark:border-rose-400/30 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-200" : "border-transparent bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/40")}><ArrowUpRight size={16} /> 我送TA</button>
-              <button type="button" onClick={() => setGiftDirection("in")} className={cn("flex-1 py-3 px-4 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all", giftDirection === "in" ? "border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-200" : "border-transparent bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/40")}><ArrowDownLeft size={16} /> TA送我</button>
+               <button type="button" onClick={() => setGiftDirection("in")} className={cn("flex-1 py-3 px-4 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all", giftDirection === "in" ? "border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-200" : "border-transparent bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/40")}><ArrowDownLeft size={16} /> TA送我</button>
             </div>
           )}
 
@@ -228,7 +214,6 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
                 <button type="button" onClick={() => setSplitType("aa")} className={cn("flex-1 py-3 rounded-xl border text-xs sm:text-sm font-medium transition-all", splitType === "aa" ? "border-orange-200 dark:border-orange-400/30 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-200" : "border-transparent bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/40")}>AA制</button>
                 <button type="button" onClick={() => setSplitType("they")} className={cn("flex-1 py-3 rounded-xl border text-xs sm:text-sm font-medium transition-all", splitType === "they" ? "border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-200" : "border-transparent bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-white/40")}>Ta请客</button>
               </div>
-
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl cursor-pointer active:scale-98 transition-transform" onClick={() => setIsMeetup(!isMeetup)}>
                 <div className="flex items-center gap-2">
                   <MapPin size={16} className={isMeetup ? "text-blue-500" : "text-gray-400"} />
@@ -241,36 +226,79 @@ export default function AddInteractionModal({ isOpen, onClose, friendId = null, 
             </div>
           )}
 
+          {/* 标题输入框 */}
           <div>
-            <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">{type === 'gift' ? '礼物名称' : '活动名称'}</label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'gift' ? "例如：乐高积木" : "例如：吃火锅"} className={inputClass} />
+            <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">{type === 'gift' ? '主题 / 备注' : '活动主题'}</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'gift' ? "例如：生日礼物" : "例如：周末出去玩"} className={inputClass} />
           </div>
 
-          {/* 修改点 2: 布局修复 
-             原来是 flex gap-4，现在改为 grid grid-cols-2 gap-4
-             强制让两个输入框各占一半宽度，不再因为日期组件过宽而挤压
-          */}
+          {/* === 明细输入区域 === */}
+          {subItems.length > 0 && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+               <label className="text-xs font-bold text-gray-400 ml-1 block uppercase tracking-wider">包含项目</label>
+               {subItems.map((item, index) => (
+                 <div key={item.id} className="flex gap-2 items-center">
+                    <input 
+                      type="text" 
+                      placeholder="项目名称" 
+                      value={item.title} 
+                      onChange={e => updateSubItem(item.id, 'title', e.target.value)}
+                      className={cn(inputClass, "flex-1 h-10 text-sm")}
+                      autoFocus={index === subItems.length - 1}
+                    />
+                    <input 
+                      type="number" 
+                      placeholder="金额" 
+                      value={item.price} 
+                      onChange={e => updateSubItem(item.id, 'price', e.target.value)}
+                      className={cn(inputClass, "w-24 h-10 text-sm appearance-none")}
+                    />
+                    <button type="button" onClick={() => removeSubItem(item.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                      <MinusCircle size={20} />
+                    </button>
+                 </div>
+               ))}
+            </div>
+          )}
+
+          {/* 日期和总价 (包含 iOS 修复) */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
              <div className="min-w-0">
                 <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Date</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} className={cn(inputClass, "px-2 py-0 leading-[3rem] tracking-wide text-center sm:text-left")} style={{ WebkitAppearance: 'none' }}/>
+                <input 
+                  type="date" 
+                  value={date} 
+                  onChange={e => setDate(e.target.value)} 
+                  className={cn(inputClass, "px-2 py-0 leading-[3rem] tracking-wide text-center sm:text-left")} 
+                  style={{ WebkitAppearance: 'none' }} 
+                />
              </div>
              <div className="min-w-0 relative">
-                <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">Price</label>
+                <label className="text-xs font-bold text-gray-400 ml-1 mb-1.5 block uppercase tracking-wider">
+                  {subItems.length > 0 ? "Total Price" : "Price"}
+                </label>
                 <div className="relative">
                   <input 
                     type="number" 
                     value={price} 
+                    // 如果有明细，总价框变为只读
+                    readOnly={subItems.length > 0}
                     onChange={e => setPrice(e.target.value)} 
                     placeholder="0.00" 
-                    className={cn(inputClass, "pl-8 appearance-none")}
+                    className={cn(inputClass, "pl-8 appearance-none", subItems.length > 0 && "bg-gray-100 dark:bg-white/10 text-gray-500")} 
                   />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold pointer-events-none">¥</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">¥</span>
                 </div>
              </div>
           </div>
 
-          <button type="submit" className="w-full py-4 mt-4 bg-black dark:bg-white hover:opacity-90 active:scale-95 text-white dark:text-black font-bold rounded-2xl shadow-xl transition-all duration-200 flex items-center justify-center gap-2">
+          {/* 添加明细按钮 */}
+          <button type="button" onClick={addSubItem} className="text-sm font-bold text-blue-500 dark:text-blue-400 flex items-center gap-1 hover:opacity-80 transition-opacity ml-1">
+             <Plus size={16} />
+             {subItems.length > 0 ? "再加一项" : "添加明细 / 包含多项"}
+          </button>
+
+          <button type="submit" className="w-full py-4 mt-2 bg-black dark:bg-white hover:opacity-90 active:scale-95 text-white dark:text-black font-bold rounded-2xl shadow-xl transition-all duration-200 flex items-center justify-center gap-2">
             <Check size={20} strokeWidth={3} />
             <span>{initialData ? "保存修改" : "保存记录"}</span>
           </button>

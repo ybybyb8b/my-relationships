@@ -304,7 +304,7 @@ export default function Home() {
               {/* 卡片右上角的状态胶囊 (深色优化) */}
               {friend.daysDiff >= 0 && (
                 <div className={cn(
-                  "absolute top-5 right-5 px-3 py-1 rounded-full text-[10px] font-bold shadow-md backdrop-blur-md flex items-center gap-1.5 z-10 transition-all ring-1 ring-black/5 dark:ring-white/10",
+                  "absolute top-4.5 right-4.5 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md backdrop-blur-md flex items-center gap-1 z-10 transition-all ring-1 ring-black/5 dark:ring-white/10",
 
                   friend.status === 'overdue' 
                     ? "bg-red-50/95 dark:bg-red-500/20 text-red-700 dark:text-red-300" 

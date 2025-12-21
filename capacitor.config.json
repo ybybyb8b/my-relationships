@@ -1,6 +1,6 @@
 {
   "appId": "com.eva.relations",
-  "appName": "DeepRelations",
+  "appName": "MyRelations",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"
